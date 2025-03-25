@@ -3,11 +3,11 @@
 <h1 align="center"><sup><img src="assets/logo.png" align="center" width=4% ></sup> <strong>InterMimic: Towards Universal Whole-Body Control for Physics-Based Human-Object Interactions</strong></h1>
   <p align="center">
     <a href='https://sirui-xu.github.io/' target='_blank'>Sirui Xu</a><sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>&emsp;
-    <a href='https://hungyuling.com/' target='_blank'>Hung Yu Ling</a> <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=2% ></sup>&emsp;
+    <a href='https://hungyuling.com/' target='_blank'>Hung Yu Ling</a> <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=1.5% ></sup>&emsp;
     <a href='https://yxw.web.illinois.edu/' target='_blank'>Yu-Xiong Wang</a><sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>&emsp;
     <a href='https://lgui.web.illinois.edu/' target='_blank'>Liang-Yan Gui</a><sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>&emsp;
     <br>
-    <sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>University of Illinois Urbana Champaign, <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=2% ></sup> Electronic Arts
+    <sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>University of Illinois Urbana Champaign, <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=1.5% ></sup> Electronic Arts
     <br>
     <strong>CVPR 2025</strong>
   </p>
