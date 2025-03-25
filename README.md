@@ -1,6 +1,6 @@
 <p align="center">
 <!-- <h1 align="center">InterDiff: Generating 3D Human-Object Interactions with Physics-Informed Diffusion</h1> -->
-<h1 align="center"><sup><img src="assets/logo.png" align="center" width=6% > <strong>InterMimic: Towards Universal Whole-Body Control for Physics-Based Human-Object Interactions</strong></h1>
+<h1 align="center"><sup><img src="assets/logo.png" align="center" width=2% > <strong>InterMimic: Towards Universal Whole-Body Control for Physics-Based Human-Object Interactions</strong></h1>
   <p align="center">
     <a href='https://sirui-xu.github.io/' target='_blank'>Sirui Xu</a><sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>&emsp;
     <a href='https://hungyuling.com/' target='_blank'>Hung Yu Ling</a> <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=2% ></sup>&emsp;
