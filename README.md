@@ -160,9 +160,9 @@ Our SMPL-X-based humanoid model is adapted from PHC. Please consider citing:
 
 This repository builds upon the following excellent open-source projects:
 
-- [IsaacGymEnvs](https://github.com/isaac-sim/IsaacGymEnvs): Provides part of the environment code  
+- [IsaacGymEnvs](https://github.com/isaac-sim/IsaacGymEnvs): Contributes to the environment code  
 - [PHC](https://github.com/ZhengyiLuo/PHC): Used for data construction  
-- [PhysHOI](https://github.com/wyhuai/PhysHOI): Contributes to environment code  
+- [PhysHOI](https://github.com/wyhuai/PhysHOI): Contributes to the environment code  
 - [OMOMO](https://github.com/lijiaman/omomo_release): Core resource for dataset construction  
 - [InterDiff](https://github.com/Sirui-Xu/InterDiff): Supports kinematic generation  
 - [HOI-Diff](https://github.com/neu-vi/HOI-Diff): Supports kinematic generation  
