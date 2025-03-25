@@ -72,7 +72,7 @@ follow the following instructions:
 ### 🎓 Teacher Policy Inference
 
 
-We’ve released a checkpoint for a teacher policy on OMOMO, along with some sample data. To get started:
+We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along with some sample data. To get started:
 
 1. Download the [teacher policy](https://drive.google.com/drive/folders/1biDUmde-h66vUW4npp8FVo2w0wOcK2_k?usp=sharing) and place it under the `teachers/` directory.
 2. Then, run the following commands:
@@ -88,9 +88,9 @@ We’ve released a checkpoint for a teacher policy on OMOMO, along with some sam
 ## 📝 TODO List  
 - [x] Release inference demo for the teacher policy  
 - [ ] Release training and inference pipeline for the teacher policy and processed MoCap data  
-- [ ] Release student policy distillation training, distilled reference data, and all related checkpoints  
+- [ ] Release student policy distillation training, distilled reference data (physically correct HOI data❗️), and all related checkpoints  
 - [ ] Release evaluation pipeline for the student policy  
-- [ ] Release all physically simulatable data and processing scripts alongside the [InterAct](https://github.com/wzyabcas/InterAct) launch  
+- [ ] Release all data and processing scripts alongside the [InterAct](https://github.com/wzyabcas/InterAct) launch  
 - [ ] Release physics-based text-to-HOI and interaction prediction demo  
 - [ ] Add support for Unitree-G1 with dexterous robot hands
 
