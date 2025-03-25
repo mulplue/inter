@@ -1,13 +1,13 @@
 <p align="center">
 <!-- <h1 align="center">InterDiff: Generating 3D Human-Object Interactions with Physics-Informed Diffusion</h1> -->
-<h1 align="center"><img src="assets/logo.png" align="center" width=4% > <strong>InterMimic: Towards Universal Whole-Body Control for Physics-Based Human-Object Interactions</strong></h1>
+<h1 align="center"><sup><img src="assets/logo.png" align="center" width=6% > <strong>InterMimic: Towards Universal Whole-Body Control for Physics-Based Human-Object Interactions</strong></h1>
   <p align="center">
     <a href='https://sirui-xu.github.io/' target='_blank'>Sirui Xu</a><sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>&emsp;
-    <a href='https://hungyuling.com/' target='_blank'>Hung Yu Ling</a><sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=2% ></sup>&emsp;
+    <a href='https://hungyuling.com/' target='_blank'>Hung Yu Ling</a> <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=2% ></sup>&emsp;
     <a href='https://yxw.web.illinois.edu/' target='_blank'>Yu-Xiong Wang</a><sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>&emsp;
     <a href='https://lgui.web.illinois.edu/' target='_blank'>Liang-Yan Gui</a><sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>&emsp;
     <br>
-    <sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>University of Illinois Urbana Champaign, <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=2% ></sup>Electronic Arts
+    <sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>University of Illinois Urbana Champaign, <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=2% ></sup> Electronic Arts
     <br>
     <strong>CVPR 2025</strong>
   </p>
@@ -80,7 +80,7 @@ We’ve released a checkpoint for a teacher policy on OMOMO, along with some sam
     conda activate intermimic
     sh scripts/test.sh
     ```
-    
+
 ## 🔥 News  
 - **[2025-03-25]** We’ve officially released the codebase and checkpoint for teacher policy inference demo — give it a try! ☕️  
 
@@ -157,17 +157,17 @@ Our SMPL-X-based humanoid model is adapted from PHC. Please consider citing:
 
 ## 👏 Acknowledgements and 📚 License
 
-This repository is built on top of the following amazing repositories:
+This repository builds upon the following excellent open-source projects:
 
-- [IsaacGymEnvs](https://github.com/isaac-sim/IsaacGymEnvs):
-- [PHC](https://github.com/ZhengyiLuo/PHC)
-- [PhysHOI](https://github.com/wyhuai/PhysHOI)
-- [OMOMO](https://github.com/lijiaman/omomo_release): Major dataset construction
-- [InterDiff](https://github.com/Sirui-Xu/InterDiff): Used for kinematic generation
-- [HOI-Diff](https://github.com/neu-vi/HOI-Diff): Used for kinematic generation
+- [IsaacGymEnvs](https://github.com/isaac-sim/IsaacGymEnvs): Provides part of the environment code  
+- [PHC](https://github.com/ZhengyiLuo/PHC): Used for data construction  
+- [PhysHOI](https://github.com/wyhuai/PhysHOI): Contributes to environment code  
+- [OMOMO](https://github.com/lijiaman/omomo_release): Core resource for dataset construction  
+- [InterDiff](https://github.com/Sirui-Xu/InterDiff): Supports kinematic generation  
+- [HOI-Diff](https://github.com/neu-vi/HOI-Diff): Supports kinematic generation  
 
-This code is distributed under an [MIT LICENSE](LICENSE).
-Note that our code depends on other libraries and uses datasets which each have their own respective licenses that must also be followed.
+This codebase is released under the [MIT License](LICENSE).  
+Please note that it also relies on external libraries and datasets, each of which may be subject to their own licenses and terms of use.
 
 
 ## 🌟 Star History
