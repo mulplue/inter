@@ -38,12 +38,13 @@
 <div style="text-align: center;">
     <img src="assets/teaser.png" width=100% >
 </div>
+<br>
 Achieving realistic simulations of humans interacting with a wide range of objects has long been a fundamental goal. Extending physics-based motion imitation to complex human-object interactions (HOIs) is challenging due to intricate human-object coupling, variability in object geometries, and artifacts in motion capture data, such as inaccurate contacts and limited hand detail. We introduce InterMimic, a framework that enables a <b>single</b> policy to robustly learn from hours of imperfect MoCap data covering <b>diverse</b> full-body interactions with <b>dynamic and varied</b> objects. Our key insight is to employ a curriculum strategy -- <b>perfect first, then scale up</b>. We first train subject-specific teacher policies to mimic, retarget, and refine motion capture data. Next, we distill these teachers into a student policy, with the teachers acting as online experts providing direct supervision, as well as high-quality references. Notably, we incorporate RL fine-tuning on the student policy to surpass mere demonstration replication and achieve higher-quality solutions. Our experiments demonstrate that InterMimic produces realistic and diverse interactions across multiple HOI datasets. The learned policy <b>generalizes</b> in a zero-shot manner and seamlessly integrates with kinematic generators, elevating the framework from mere imitation to generative modeling of complex human-object interactions.
 </br>
 
 ## 📹 Demo
 <p align="center">
-    <img src="assets/InterMimic.gif" align="center" width=70% >
+    <img src="assets/InterMimic.gif" align="center" width=60% >
 </p>
 
 
