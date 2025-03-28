@@ -17,19 +17,13 @@
 <p align="center">
   <a href='https://arxiv.org/abs/2502.20390'>
     <img src='https://img.shields.io/badge/Arxiv-2502.20390-A42C25?style=flat&logo=arXiv&logoColor=A42C25'>
-  </a>
-  <a href='https://arxiv.org/pdf/2502.20390.pdf'>
+  </a><a href='https://arxiv.org/pdf/2502.20390.pdf'>
     <img src='https://img.shields.io/badge/Paper-PDF-yellow?style=flat&logo=arXiv&logoColor=yellow'>
-  </a>
-  <a href='https://sirui-xu.github.io/InterMimic/'>
-  <img src='https://img.shields.io/badge/Project-Page-green?style=flat&logo=Google%20chrome&logoColor=green'></a>
-  <a href='https://youtu.be/ZJT387dvI9w'>
-  <img src='https://img.shields.io/badge/YouTube-Video-EA3323?style=flat&logo=youtube&logoColor=EA3323'></a>
-  <a href='https://www.bilibili.com/video/BV1nW9KYFEUX/'>
-    <img src='https://img.shields.io/badge/Bilibili-Video-4EABE6?style=flat&logo=Bilibili&logoColor=4EABE6'></a>
-  <a href='https://github.com/Sirui-Xu/InterMimic'>
-    <img src='https://img.shields.io/badge/GitHub-Code-black?style=flat&logo=github&logoColor=white'></a>
-  <a href="" target='_blank'>
+  </a><a href='https://sirui-xu.github.io/InterMimic/'>
+  <img src='https://img.shields.io/badge/Project-Page-green?style=flat&logo=Google%20chrome&logoColor=green'></a><a href='https://youtu.be/ZJT387dvI9w'>
+  <img src='https://img.shields.io/badge/YouTube-Video-EA3323?style=flat&logo=youtube&logoColor=EA3323'></a><a href='https://www.bilibili.com/video/BV1nW9KYFEUX/'>
+    <img src='https://img.shields.io/badge/Bilibili-Video-4EABE6?style=flat&logo=Bilibili&logoColor=4EABE6'></a><a href='https://github.com/Sirui-Xu/InterMimic'>
+    <img src='https://img.shields.io/badge/GitHub-Code-black?style=flat&logo=github&logoColor=white'></a><a href="" target='_blank'>
     <img src="https://visitor-badge.laobi.icu/badge?page_id=Sirui-Xu.InterMimic&left_color=gray&right_color=orange">
   </a>
 </p>
