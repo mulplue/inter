@@ -1,30 +1,3 @@
-# Copyright (c) 2018-2022, NVIDIA Corporation
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this
-#    list of conditions and the following disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice,
-#    this list of conditions and the following disclaimer in the documentation
-#    and/or other materials provided with the distribution.
-#
-# 3. Neither the name of the copyright holder nor the names of its
-#    contributors may be used to endorse or promote products derived from
-#    this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from enum import Enum
 import numpy as np
 import torch
@@ -65,14 +38,15 @@ class InterMimic(Humanoid_SMPLX):
         self.more_rigid = cfg['env']['moreRigid']
         self.rollout_length = cfg['env']['rolloutLength']
         motion_file = os.listdir(self.motion_file)
-        self.motion_file = sorted([os.path.join(self.motion_file, data_path) for data_path in motion_file if data_path.split('_')[0] in ['sub2']])
+        self.motion_file = sorted([os.path.join(self.motion_file, data_path) for data_path in motion_file if data_path.split('_')[0] in cfg['env']['dataSub']])
         self.object_name = [motion_example.split('_')[-2] for motion_example in self.motion_file]
         object_name_set = sorted(list(set(self.object_name)))
         print(self.motion_file, object_name_set)
         self.object_id = to_torch([object_name_set.index(name) for name in self.object_name], dtype=torch.long).cuda()
         self.obj2motion = torch.stack([self.object_id == k for k in range(len(object_name_set))], dim=0)
         self.object_name = object_name_set
-        self.robot_type = "smplx/omomo.xml"
+        self.robot_type = cfg['env']['robotType']
+        self.object_density = cfg['env']['objectDensity']
 
         print(self.robot_type)
         self.num_motions = len(self.motion_file)
@@ -91,24 +65,12 @@ class InterMimic(Humanoid_SMPLX):
         self._hist_obs = torch.zeros((self.num_envs, self.ref_hoi_obs_size), device=self.device, dtype=torch.float)
         self._tar_pos = torch.zeros([self.num_envs, 3], device=self.device, dtype=torch.float)
         self._reset_ig = torch.zeros([self.num_envs], device=self.device, dtype=torch.bool)
-        # self._curr_reward = torch.zeros([self.num_envs, 300], device=self.device, dtype=torch.float)
-        # self._sum_reward = torch.zeros([self.num_envs], device=self.device, dtype=torch.float)
-        # self._curr_state = torch.zeros([self.num_envs, 300, 179+153], device=self.device, dtype=torch.float)
         self._build_target_tensors()
 
         return
 
     def _compute_reward(self, actions):
         super()._compute_reward(actions)
-        # index = torch.arange(self._curr_reward.shape[0])
-        # self._curr_reward[index, self.progress_buf - self.start_times] = self.rew_buf
-        # self._sum_reward[index] += self.rew_buf
-        # self._curr_state[index, self.progress_buf - self.start_times, :] = torch.cat([
-        #     self._humanoid_root_states,
-        #     self._target_states,
-        #     self._dof_pos,
-        #     self._dof_vel
-        # ], dim=1)
         return
 
     def _compute_reset(self):
@@ -272,7 +234,7 @@ class InterMimic(Humanoid_SMPLX):
 
 
     def _load_target_asset(self): # smplx
-        asset_root = "intermimic/data/assets/mjcf/"
+        asset_root = "intermimic/data/assets/objects/"
         self._target_asset = []
         points_num = []
         self.object_points = []
@@ -281,7 +243,7 @@ class InterMimic(Humanoid_SMPLX):
             asset_file = object_name + ".urdf"
             obj_file = asset_root + 'objects/' + object_name + '/' + object_name + '.obj'
             max_convex_hulls = 64
-            density = 200
+            density = self.object_density
         
             asset_options = gymapi.AssetOptions()
             asset_options.angular_damping = 0.01
@@ -314,7 +276,7 @@ class InterMimic(Humanoid_SMPLX):
 
     def _build_target(self, env_id, env_ptr):
         col_group = env_id
-        col_filter = 2
+        col_filter = 0
         segmentation_id = 0
 
         default_pose = gymapi.Transform()

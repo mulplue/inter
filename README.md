@@ -9,7 +9,7 @@
     <br>
     <sup><img src="assets/Illinois.jpg" align="center" width=2% ></sup>University of Illinois Urbana Champaign, <sup><img src="assets/Electronic-Arts-Logo.png" align="center" width=1.5% ></sup> Electronic Arts
     <br>
-    <strong>CVPR 2025</strong>
+    <strong>CVPR 2025 Highlight 🏆</strong>
   </p>
 </p>
 
@@ -36,7 +36,7 @@
     <img src="assets/teaser.png" width=100% >
 </div>
 <br>
-Achieving realistic simulations of humans interacting with a wide range of objects has long been a fundamental goal. Extending physics-based motion imitation to complex human-object interactions (HOIs) is challenging due to intricate human-object coupling, variability in object geometries, and artifacts in motion capture data, such as inaccurate contacts and limited hand detail. We introduce InterMimic, a framework that enables a <b>single</b> policy to robustly learn from hours of imperfect MoCap data covering <b>diverse</b> full-body interactions with <b>dynamic and varied</b> objects. Our key insight is to employ a curriculum strategy -- <b>perfect first, then scale up</b>. We first train subject-specific teacher policies to mimic, retarget, and refine motion capture data. Next, we distill these teachers into a student policy, with the teachers acting as online experts providing direct supervision, as well as high-quality references. Notably, we incorporate RL fine-tuning on the student policy to surpass mere demonstration replication and achieve higher-quality solutions. Our experiments demonstrate that InterMimic produces realistic and diverse interactions across multiple HOI datasets. The learned policy <b>generalizes</b> in a zero-shot manner and seamlessly integrates with kinematic generators, elevating the framework from mere imitation to generative modeling of complex human-object interactions.
+We introduce InterMimic, a framework that enables a <b>single</b> policy to robustly learn from hours of imperfect MoCap data covering <b>diverse</b> full-body interactions with <b>dynamic and varied</b> objects, supporting both <b>SMPLX</b> and <b>Unitree G1</b> humanoids.
 </br>
 
 ## 📹 Demo
@@ -44,8 +44,12 @@ Achieving realistic simulations of humans interacting with a wide range of objec
     <img src="assets/InterMimic.gif" align="center" width=60% >
 </p>
 
+## 🔥 News  
+- **[2025-04-05]** We're excited by the overwhelming interest in humanoid robot support and are ahead of schedule in open-sourcing our Unitree-G1 integration—starting with a small demo with support for Unitree three-finger dexterous hands. Join us in pioneering whole-body loco-manipulation with humanoid robots.
+- **[2025-04-04]** InterMimic has been selected as a CVPR Highlight Paper 🏆. More exciting developments are on the way!
+- **[2025-03-25]** We’ve officially released the codebase and checkpoint for teacher policy inference demo — give it a try! ☕️  
 
-## 📖 Implementation
+## 📖 Getting Started
 
 ### Dependencies
 
@@ -71,7 +75,7 @@ follow the following instructions:
 
 We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along with some sample data. To get started:
 
-1. Download the [teacher policy](https://drive.google.com/drive/folders/1biDUmde-h66vUW4npp8FVo2w0wOcK2_k?usp=sharing) and place it under the `teachers/` directory.
+1. Download the [checkpoints](https://drive.google.com/drive/folders/1biDUmde-h66vUW4npp8FVo2w0wOcK2_k?usp=sharing) and place them in the current directory.
 2. Then, run the following commands:
 
     ```bash
@@ -79,17 +83,21 @@ We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along
     sh scripts/test.sh
     ```
 
-## 🔥 News  
-- **[2025-03-25]** We’ve officially released the codebase and checkpoint for teacher policy inference demo — give it a try! ☕️  
+3. 🔥 New! To try it on the Unitree G1 with its three-fingered dexterous hand:
+
+    ```bash
+    conda activate intermimic
+    sh scripts/test_g1.sh
+    ```
 
 ## 📝 TODO List  
 - [x] Release inference demo for the teacher policy  
-- [ ] Release training and inference pipeline for the teacher policy and processed MoCap data  
+- [x] Add support for Unitree-G1 with dexterous robot hands
+- [ ] Release training pipeline for the teacher policy and processed MoCap data  
 - [ ] Release student policy distillation training, distilled reference data (physically correct HOI data❗️), and all related checkpoints  
 - [ ] Release evaluation pipeline for the student policy  
 - [ ] Release all data and processing scripts alongside the [InterAct](https://github.com/wzyabcas/InterAct) launch  
 - [ ] Release physics-based text-to-HOI and interaction prediction demo  
-- [ ] Add support for Unitree-G1 with dexterous robot hands
 
 
 ## 🔗 Citation
@@ -121,14 +129,14 @@ Our integrated kinematic model builds upon **InterDiff**, **HOI-Diff**, and **In
 
 ```bibtex
 @inproceedings{xu2024interdreamer,
-  title = {InterDreamer: Zero-Shot Text to 3D Dynamic Human-Object Interaction},
+  title = {{InterDreamer}: Zero-Shot Text to 3D Dynamic Human-Object Interaction},
   author = {Xu, Sirui and Wang, Ziyin and Wang, Yu-Xiong and Gui, Liang-Yan},
   booktitle = {NeurIPS},
   year = {2024},
 }
 
 @inproceedings{xu2023interdiff,
-  title = {InterDiff: Generating 3D Human-Object Interactions with Physics-Informed Diffusion},
+  title = {{InterDiff}: Generating 3D Human-Object Interactions with Physics-Informed Diffusion},
   author = {Xu, Sirui and Li, Zhengyuan and Wang, Yu-Xiong and Gui, Liang-Yan},
   booktitle = {ICCV},
   year = {2023},
@@ -157,10 +165,11 @@ Our SMPL-X-based humanoid model is adapted from PHC. Please consider citing:
 
 This repository builds upon the following excellent open-source projects:
 
-- [IsaacGymEnvs](https://github.com/isaac-sim/IsaacGymEnvs): Contributes to the environment code  
+- [IsaacGymEnvs](https://github.com/isaac-sim/IsaacGymEnvs): Contributes to the environment code
+- [rl_games](https://github.com/Denys88/rl_games): Serves as the core reinforcement learning framework.
 - [PHC](https://github.com/ZhengyiLuo/PHC): Used for data construction  
 - [PhysHOI](https://github.com/wyhuai/PhysHOI): Contributes to the environment code  
-- [OMOMO](https://github.com/lijiaman/omomo_release): Core resource for dataset construction  
+- [InterAct](https://github.com/wzyabcas/InterAct), [OMOMO](https://github.com/lijiaman/omomo_release): Core resource for dataset construction  
 - [InterDiff](https://github.com/Sirui-Xu/InterDiff): Supports kinematic generation  
 - [HOI-Diff](https://github.com/neu-vi/HOI-Diff): Supports kinematic generation  
 
