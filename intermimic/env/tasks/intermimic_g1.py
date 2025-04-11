@@ -66,9 +66,9 @@ class InterMimicG1(Humanoid_G1, InterMimic):
 
             loaded_dict['dof_pos'] = loaded_dict['hoi_data'][:, 9:9+153].clone()
 
-            loaded_dict['dof_pos_vel'] = []
-            loaded_dict['dof_pos_vel'] = (loaded_dict['dof_pos'][1:,:].clone() - loaded_dict['dof_pos'][:-1,:].clone())*self.fps_data
-            loaded_dict['dof_pos_vel'] = torch.cat((torch.zeros((1, loaded_dict['dof_pos_vel'].shape[-1])).to('cuda'),loaded_dict['dof_pos_vel']),dim=0)
+            loaded_dict['dof_vel'] = []
+            loaded_dict['dof_vel'] = (loaded_dict['dof_pos'][1:,:].clone() - loaded_dict['dof_pos'][:-1,:].clone())*self.fps_data
+            loaded_dict['dof_vel'] = torch.cat((torch.zeros((1, loaded_dict['dof_vel'].shape[-1])).to('cuda'),loaded_dict['dof_vel']),dim=0)
 
             loaded_dict['body_pos'] = loaded_dict['hoi_data'][:, 162: 162+52*3].clone().view(self.max_episode_length[-1],52,3)
             loaded_dict['key_body_pos'] = loaded_dict['body_pos'][:, self._key_body_ids_gt, :].view(self.max_episode_length[-1],-1).clone()
@@ -95,6 +95,7 @@ class InterMimicG1(Humanoid_G1, InterMimic):
             heading_rot = torch_utils.calc_heading_quat_inv(loaded_dict['root_rot'])
             heading_rot_extend = heading_rot.unsqueeze(1).repeat(1, key_body_pose.shape[1] // 3, 1).view(-1, 4)
             ref_ig = quat_rotate(heading_rot_extend, ref_ig).view(loaded_dict['obj_rot'].shape[0], -1)    
+            loaded_dict['ref_ig'] = ref_ig
             loaded_dict['contact'] = torch.round(loaded_dict['hoi_data'][:, 330:331].clone())
             loaded_dict['contact_parts'] = torch.round(loaded_dict['hoi_data'][:, 331:331+52].clone())
             loaded_dict['human_rot'] = loaded_dict['hoi_data'][:, 331+52:331+52+52*4].clone()
@@ -107,7 +108,7 @@ class InterMimicG1(Humanoid_G1, InterMimic):
                                                     loaded_dict['root_pos'].clone(), 
                                                     loaded_dict['root_rot'].clone(), 
                                                     loaded_dict['dof_pos'].clone(), 
-                                                    loaded_dict['dof_pos_vel'].clone(),
+                                                    loaded_dict['dof_vel'].clone(),
                                                     loaded_dict['obj_pos'].clone(),
                                                     loaded_dict['obj_rot'].clone(),
                                                     loaded_dict['obj_pos_vel'].clone(), 
@@ -115,7 +116,7 @@ class InterMimicG1(Humanoid_G1, InterMimic):
                                                     loaded_dict['key_body_pos'][:,:].clone(),
                                                     loaded_dict['contact'].clone(),
                                                     loaded_dict['contact_parts'].clone(),
-                                                    ref_ig.clone(),
+                                                    loaded_dict['ref_ig'].clone(),
                                                     loaded_dict['human_rot'].clone(),
                                                     loaded_dict['key_body_pos_vel'].clone(),
                                                     loaded_dict['human_rot_vel'],
@@ -129,7 +130,7 @@ class InterMimicG1(Humanoid_G1, InterMimic):
                                 loaded_dict['root_pos'].clone(), 
                                 loaded_dict['root_rot'].clone(), 
                                 loaded_dict['dof_pos'].clone(), 
-                                loaded_dict['dof_pos_vel'].clone(), 
+                                loaded_dict['dof_vel'].clone(), 
                                 loaded_dict['root_pos_vel'].clone(),
                                 loaded_dict['root_rot_vel'].clone(), 
                                 loaded_dict['obj_pos'].clone(),
@@ -155,6 +156,7 @@ class InterMimicG1(Humanoid_G1, InterMimic):
         self.ref_reward = torch.zeros((self.hoi_refs.shape[0], self.hoi_refs.shape[1], self.hoi_refs.shape[2])).to(self.hoi_refs.device)
         self.ref_reward[:, 0, :] = 1.0
         self.ref_index = torch.zeros((self.num_envs, )).long().to(self.hoi_refs.device)
+        self.create_component_stat(loaded_dict)
         return
 
 
@@ -286,3 +288,6 @@ class InterMimicG1(Humanoid_G1, InterMimic):
         body_rot_vel_new[:, _key_body_ids_gt] = body_rot_vel
         obs = torch.cat((root_pos, root_rot, dof_pos_new, dof_vel_new, target_states, key_body_pos.contiguous().view(-1,key_body_pos.shape[1]*key_body_pos.shape[2]), target_contact, contact_new, ig, body_rot_new.view(-1, 52*4), body_vel.view(-1,key_body_pos.shape[1]*key_body_pos.shape[2]), body_rot_vel_new.view(-1, 52*3)), dim=-1)
         return obs
+    
+    def play_dataset_step(self, time):
+        return

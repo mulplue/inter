@@ -68,6 +68,19 @@ follow the following instructions:
 
 2. Download and setup [Isaac Gym](https://developer.nvidia.com/isaac-gym). 
 
+### 💾 Data Replay
+
+
+run the following commands:
+
+    ```bash
+    conda activate intermimic
+    sh scripts/data_replay.sh
+    ```
+
+Note: The link colors represent the ground truth contact markers.
+
+
 ### 🎓 Teacher Policy Inference
 
 

@@ -121,10 +121,10 @@ class InterMimic(Humanoid_SMPLX):
 
             loaded_dict['dof_pos'] = loaded_dict['hoi_data'][:, 9:9+153].clone()
 
-            loaded_dict['dof_pos_vel'] = []
+            loaded_dict['dof_vel'] = []
 
-            loaded_dict['dof_pos_vel'] = (loaded_dict['dof_pos'][1:,:].clone() - loaded_dict['dof_pos'][:-1,:].clone())*self.fps_data
-            loaded_dict['dof_pos_vel'] = torch.cat((torch.zeros((1, loaded_dict['dof_pos_vel'].shape[-1])).to('cuda'),loaded_dict['dof_pos_vel']),dim=0)
+            loaded_dict['dof_vel'] = (loaded_dict['dof_pos'][1:,:].clone() - loaded_dict['dof_pos'][:-1,:].clone())*self.fps_data
+            loaded_dict['dof_vel'] = torch.cat((torch.zeros((1, loaded_dict['dof_vel'].shape[-1])).to('cuda'),loaded_dict['dof_vel']),dim=0)
 
             loaded_dict['body_pos'] = loaded_dict['hoi_data'][:, 162: 162+52*3].clone().view(self.max_episode_length[-1],52,3)
             loaded_dict['key_body_pos'] = loaded_dict['body_pos'][:, self._key_body_ids, :].view(self.max_episode_length[-1],-1).clone()
@@ -154,8 +154,9 @@ class InterMimic(Humanoid_SMPLX):
             heading_rot = torch_utils.calc_heading_quat_inv(loaded_dict['root_rot'])
             heading_rot_extend = heading_rot.unsqueeze(1).repeat(1, key_body_pose.shape[1] // 3, 1).view(-1, 4)
             ref_ig = quat_rotate(heading_rot_extend, ref_ig).view(loaded_dict['obj_rot'].shape[0], -1)    
-            loaded_dict['contact'] = torch.round(loaded_dict['hoi_data'][:, 330:331].clone())
-            loaded_dict['contact_parts'] = torch.round(loaded_dict['hoi_data'][:, 331:331+52].clone())
+            loaded_dict['ref_ig'] = ref_ig
+            loaded_dict['contact_obj'] = torch.round(loaded_dict['hoi_data'][:, 330:331].clone())
+            loaded_dict['contact_human'] = torch.round(loaded_dict['hoi_data'][:, 331:331+52].clone())
             loaded_dict['human_rot'] = loaded_dict['hoi_data'][:, 331+52:331+52+52*4].clone()
 
             human_rot_exp_map = torch_utils.quat_to_exp_map(loaded_dict['human_rot'].view(-1, 4)).view(-1, 52*3)
@@ -166,15 +167,15 @@ class InterMimic(Humanoid_SMPLX):
                                                     loaded_dict['root_pos'].clone(), 
                                                     loaded_dict['root_rot'].clone(), 
                                                     loaded_dict['dof_pos'].clone(), 
-                                                    loaded_dict['dof_pos_vel'].clone(),
+                                                    loaded_dict['dof_vel'].clone(),
                                                     loaded_dict['obj_pos'].clone(),
                                                     loaded_dict['obj_rot'].clone(),
                                                     loaded_dict['obj_pos_vel'].clone(), 
                                                     loaded_dict['obj_rot_vel'].clone(),
                                                     loaded_dict['key_body_pos'][:,:].clone(),
-                                                    loaded_dict['contact'].clone(),
-                                                    loaded_dict['contact_parts'].clone(),
-                                                    ref_ig.clone(),
+                                                    loaded_dict['contact_obj'].clone(),
+                                                    loaded_dict['contact_human'].clone(),
+                                                    loaded_dict['ref_ig'].clone(),
                                                     loaded_dict['human_rot'].clone(),
                                                     loaded_dict['key_body_pos_vel'].clone(),
                                                     loaded_dict['human_rot_vel'],
@@ -187,7 +188,7 @@ class InterMimic(Humanoid_SMPLX):
                                 loaded_dict['root_pos'].clone(), 
                                 loaded_dict['root_rot'].clone(), 
                                 loaded_dict['dof_pos'].clone(), 
-                                loaded_dict['dof_pos_vel'].clone(), 
+                                loaded_dict['dof_vel'].clone(), 
                                 loaded_dict['root_pos_vel'].clone(),
                                 loaded_dict['root_rot_vel'].clone(), 
                                 loaded_dict['obj_pos'].clone(),
@@ -213,8 +214,71 @@ class InterMimic(Humanoid_SMPLX):
         self.ref_reward[:, 0, :] = 1.0
 
         self.ref_index = torch.zeros((self.num_envs, )).long().to(self.hoi_refs.device)
+        self.create_component_stat(loaded_dict)
         return
 
+    def create_component_stat(self, loaded_dict):
+        self.data_component_order = [
+            'root_pos', 'root_rot', 'dof_pos', 'dof_vel', 'obj_pos', 'obj_rot', 
+            'obj_pos_vel', 'obj_rot_vel', 'key_body_pos', 'contact_obj', 
+            'contact_human', 'ref_ig', 'human_rot', 'key_body_pos_vel', 'human_rot_vel'
+        ]
+
+        # Precompute the sizes for each component.
+        # For 'ref_ig', use ref_ig.shape[1] otherwise use loaded_dict[name].shape[1].
+        data_component_sizes = [
+            loaded_dict[name].shape[1]
+            for name in self.data_component_order
+        ]
+
+        # Precompute cumulative indices. The first index is zero.
+        # For each i, calculate the sum of component_sizes[:i] to determine the starting index for that component.
+        self.data_component_index = [sum(data_component_sizes[:i]) for i in range(len(data_component_sizes) + 1)]
+
+        self.ref_component_order = [
+            'root_pos', 'root_rot', 'dof_pos', 'dof_vel', 'root_pos_vel', 'root_rot_vel', 'obj_pos', 'obj_rot', 
+            'obj_pos_vel', 'obj_rot_vel'
+        ]
+
+        # Precompute the sizes for each component.
+        # For 'ref_ig', use ref_ig.shape[1] otherwise use loaded_dict[name].shape[1].
+        ref_component_sizes = [
+            loaded_dict[name].shape[1]
+            for name in self.ref_component_order
+        ]
+
+        # Precompute cumulative indices. The first index is zero.
+        # For each i, calculate the sum of component_sizes[:i] to determine the starting index for that component.
+        self.ref_component_index = [sum(ref_component_sizes[:i]) for i in range(len(ref_component_sizes) + 1)]
+
+    def extract_ref_component(self, var_name, data_id, ref_index, t):
+        index = self.ref_component_order.index(var_name)
+        
+        # The number of columns to extract for this component.
+        start = self.ref_component_index[index]
+        end = self.ref_component_index[index+1]
+        
+        return self.hoi_refs[data_id, ref_index, t, start:end]
+
+
+    def extract_data_component(self, var_name, ref=False, data_id=None, t=None, obs=None):
+        index = self.data_component_order.index(var_name)
+        
+        # The number of columns to extract for this component.
+        start = self.data_component_index[index]
+        end = self.data_component_index[index+1]
+        
+        if ref and data_id is not None and t is not None:
+            return self.hoi_data[data_id, t, start:end]
+        
+        elif ref:
+            return self._curr_ref_obs[:, start:end]
+        
+        elif obs is not None:
+            return obs[..., start:end]
+        
+        else:
+            return self._curr_obs[:, start:end]
 
     def _create_envs(self, num_envs, spacing, num_per_row):
 
@@ -315,10 +379,10 @@ class InterMimic(Humanoid_SMPLX):
         return
     
     def _reset_target(self, env_ids):
-        self._target_states[env_ids, :3] = self.hoi_refs[self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids], 319:322]
-        self._target_states[env_ids, 3:7] = self.hoi_refs[self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids], 322:326]
-        self._target_states[env_ids, 7:10] = self.hoi_refs[self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids], 326:329]
-        self._target_states[env_ids, 10:13] = self.hoi_refs[self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids], 329:332]
+        self._target_states[env_ids, :3] = self.extract_ref_component('obj_pos', self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids])
+        self._target_states[env_ids, 3:7] = self.extract_ref_component('obj_rot', self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids])
+        self._target_states[env_ids, 7:10] = self.extract_ref_component('obj_pos_vel', self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids])
+        self._target_states[env_ids, 10:13] = self.extract_ref_component('obj_rot_vel', self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids])
         return
     
 
@@ -386,12 +450,12 @@ class InterMimic(Humanoid_SMPLX):
         self._hist_obs[env_ids] = 0
         self.contact_reset[env_ids] = 0 
         self._set_env_state(env_ids=env_ids,
-                            root_pos=self.hoi_refs[i, idx, motion_times, 0:3],
-                            root_rot=self.hoi_refs[i, idx, motion_times, 3:7],
-                            dof_pos=self.hoi_refs[i, idx, motion_times, 7:160],
-                            root_vel=self.hoi_refs[i, idx, motion_times, 313:316],
-                            root_ang_vel=self.hoi_refs[i, idx, motion_times, 316:319],
-                            dof_vel=self.hoi_refs[i, idx, motion_times, 160:313],
+                            root_pos=self.extract_ref_component('root_pos', i, idx, motion_times),
+                            root_rot=self.extract_ref_component('root_rot', i, idx, motion_times),
+                            dof_pos=self.extract_ref_component('dof_pos', i, idx, motion_times),
+                            root_vel=self.extract_ref_component('root_pos_vel', i, idx, motion_times),
+                            root_ang_vel=self.extract_ref_component('root_rot_vel', i, idx, motion_times),
+                            dof_vel=self.extract_ref_component('dof_vel', i, idx, motion_times),
                             )
 
         return
@@ -424,12 +488,12 @@ class InterMimic(Humanoid_SMPLX):
         self._hist_obs[env_ids] = 0
         self.contact_reset[env_ids] = 0 
         self._set_env_state(env_ids=env_ids,
-                            root_pos=self.hoi_refs[i, idx, motion_times, 0:3],
-                            root_rot=self.hoi_refs[i, idx, motion_times, 3:7],
-                            dof_pos=self.hoi_refs[i, idx, motion_times, 7:160],
-                            root_vel=self.hoi_refs[i, idx, motion_times, 313:316],
-                            root_ang_vel=self.hoi_refs[i, idx, motion_times, 316:319],
-                            dof_vel=self.hoi_refs[i, idx, motion_times, 160:313],
+                            root_pos=self.extract_ref_component('root_pos', i, idx, motion_times),
+                            root_rot=self.extract_ref_component('root_rot', i, idx, motion_times),
+                            dof_pos=self.extract_ref_component('dof_pos', i, idx, motion_times),
+                            root_vel=self.extract_ref_component('root_pos_vel', i, idx, motion_times),
+                            root_ang_vel=self.extract_ref_component('root_rot_vel', i, idx, motion_times),
+                            dof_vel=self.extract_ref_component('dof_vel', i, idx, motion_times),
                             )
         return
 
@@ -470,10 +534,10 @@ class InterMimic(Humanoid_SMPLX):
         return torch.cat((obs,ig_all,ref_ig-ig),dim=-1)
         
     def _compute_ig_obs(self, env_ids, ref_obs, obj_points):
-        key_body_pose = self._rigid_body_pos[env_ids].clone() 
-        ig = compute_sdf(key_body_pose, obj_points).view(-1, 3)
+        body_pose = self._rigid_body_pos[env_ids].clone() 
+        ig = compute_sdf(body_pose, obj_points).view(-1, 3)
         heading_rot = torch_utils.calc_heading_quat_inv(self._rigid_body_rot[env_ids][:, 0, :])
-        heading_rot_extend = heading_rot.unsqueeze(1).repeat(1, key_body_pose.shape[1], 1).view(-1, 4)
+        heading_rot_extend = heading_rot.unsqueeze(1).repeat(1, body_pose.shape[1], 1).view(-1, 4)
         ig = quat_rotate(heading_rot_extend, ig).view(env_ids.shape[0], -1, 3)
         ig_norm = ig.norm(dim=-1, keepdim=True)
         ig_all = ig / (ig_norm + 1e-6) * (-5 * ig_norm).exp()
@@ -529,67 +593,6 @@ class InterMimic(Humanoid_SMPLX):
                                                                    self._rigid_body_ang_vel[env_ids]).float()
         return
 
-
-    def play_dataset_step(self, time):
-
-        t = time
-        if t == 0:
-            self.data_id = to_torch([torch.where(self.obj2motion[i % len(self.object_name)] == 1)[0][torch.randint(self.obj2motion[i % len(self.object_name)].sum(), ())] for i in range(self.num_envs)], device=self.device, dtype=torch.long)
-        env_ids = to_torch([i for i in range(self.num_envs) if t < self.max_episode_length[self.data_id[i]]], device=self.device, dtype=torch.long)
-
-        ### update object ###
-        self._target_states[env_ids, :3] = self.hoi_refs[self.data_id[env_ids], 0, t, 319:322]
-        self._target_states[env_ids, 3:7] = self.hoi_refs[self.data_id[env_ids], 0, t, 322:326]
-        self._target_states[env_ids, 7:10] = torch.zeros_like(self._target_states[env_ids, 7:10])# self.hoi_refs[self.data_id[env_ids], 0, t, 326:329]
-        self._target_states[env_ids, 10:13] = torch.zeros_like(self._target_states[env_ids, 10:13])# self.hoi_refs[self.data_id[env_ids], 0, t, 329:332]
-
-        ### update subject ###   
-        _humanoid_root_pos = self.hoi_refs[self.data_id[env_ids], 0, t, 0:3]
-        _humanoid_root_rot = self.hoi_refs[self.data_id[env_ids], 0, t, 3:7]
-        self._humanoid_root_states[env_ids, 0:3] = _humanoid_root_pos
-        self._humanoid_root_states[env_ids, 3:7] = _humanoid_root_rot
-        self._humanoid_root_states[:, 7:10] = torch.zeros_like(self._humanoid_root_states[:, 7:10])
-        self._humanoid_root_states[:, 10:13] = torch.zeros_like(self._humanoid_root_states[:, 10:13])
-        
-        self._dof_pos[env_ids] = self.hoi_refs[self.data_id[env_ids], 0, t, 7:160]
-        self._dof_vel[env_ids] = self.hoi_refs[self.data_id[env_ids], 0, t, 160:313]
-
-
-        env_ids_int32 = self._humanoid_actor_ids[env_ids]
-        self.gym.set_actor_root_state_tensor_indexed(self.sim,
-                                                     gymtorch.unwrap_tensor(self._root_states),
-                                                     gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-        self.gym.set_dof_state_tensor_indexed(self.sim,
-                                              gymtorch.unwrap_tensor(self._dof_state),
-                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-        
-        env_ids_int32 = self._tar_actor_ids[env_ids]
-        self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._root_states),
-                                                    gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-
-        self._refresh_sim_tensors()
-        self.render(t=t)
-        self.gym.simulate(self.sim)
-
-        return
-    
-
-    def render(self, sync_frame_time=False, t=0):
-        super().render(sync_frame_time)
-
-        if self.viewer:  
-            if self.save_images:
-                env_ids = 0
-                if self.play_dataset:
-                    frame_id = t
-                else:
-                    frame_id = self.progress_buf[env_ids]
-                dataname = self.motion_file[-1][6:-3]
-                rgb_filename = "intermimic/data/images/" + dataname + "/rgb_env%d_frame%05d.png" % (env_ids, frame_id)
-                os.makedirs("intermimic/data/images/" + dataname, exist_ok=True)
-                self.gym.write_viewer_image_to_file(self.viewer,rgb_filename)
-        return
-
     def compute_obj_observations(self, root_states, tar_states, object_points, ref_obs):
         root_pos = root_states[:, 0:3]
         root_rot = root_states[:, 3:7]
@@ -615,14 +618,14 @@ class InterMimic(Humanoid_SMPLX):
         local_tar_rot = quat_mul(heading_rot, tar_rot)
         local_tar_rot_obs = torch_utils.quat_to_tan_norm(local_tar_rot)
 
-        _ref_obj_pos = ref_obs[:,313:316]
+        _ref_obj_pos = self.extract_data_component('obj_pos', obs=ref_obs)
         diff_global_obj_pos = _ref_obj_pos - tar_pos
         diff_local_obj_pos_flat = torch_utils.quat_rotate(heading_rot, diff_global_obj_pos)
 
         local_ref_obj_pos = _ref_obj_pos - root_pos  # preserves the body position
         local_ref_obj_pos = torch_utils.quat_rotate(heading_rot, local_ref_obj_pos)
 
-        ref_obj_rot = ref_obs[:,316:320]
+        ref_obj_rot = self.extract_data_component('obj_rot', obs=ref_obs)
         diff_global_obj_rot = torch_utils.quat_mul_norm(torch_utils.quat_inverse(ref_obj_rot), tar_rot)
         diff_local_obj_rot_flat = torch_utils.quat_mul(torch_utils.quat_mul(heading_rot, diff_global_obj_rot.view(-1, 4)), heading_inv_rot)  # Need to be change of basis
         diff_local_obj_rot_obs = torch_utils.quat_to_tan_norm(diff_local_obj_rot_flat)
@@ -630,11 +633,11 @@ class InterMimic(Humanoid_SMPLX):
         local_ref_obj_rot = torch_utils.quat_mul(heading_rot, ref_obj_rot)
         local_ref_obj_rot = torch_utils.quat_to_tan_norm(local_ref_obj_rot)
 
-        ref_obj_vel = ref_obs[:, 320:323]
+        ref_obj_vel = self.extract_data_component('obj_pos_vel', obs=ref_obs)
         diff_global_vel = ref_obj_vel - tar_vel
         diff_local_vel = torch_utils.quat_rotate(heading_rot, diff_global_vel)
 
-        ref_obj_ang_vel = ref_obs[:, 323:326]
+        ref_obj_ang_vel = self.extract_data_component('obj_rot_vel', obs=ref_obs)
         diff_global_ang_vel = ref_obj_ang_vel - tar_ang_vel
         diff_local_ang_vel = torch_utils.quat_rotate(heading_rot, diff_global_ang_vel)
 
@@ -677,6 +680,100 @@ class InterMimic(Humanoid_SMPLX):
 
         return reset, terminated
 
+
+    def play_dataset_step(self, time):
+
+        t = time
+        if t == 0:
+            self.data_id = to_torch([torch.where(self.obj2motion[i % len(self.object_name)] == 1)[0][torch.randint(self.obj2motion[i % len(self.object_name)].sum(), ())] for i in range(self.num_envs)], device=self.device, dtype=torch.long)
+        env_ids = to_torch([i for i in range(self.num_envs)], device=self.device, dtype=torch.long)
+        t = to_torch(
+                [
+                    t if t < self.max_episode_length[self.data_id[i]] else self.max_episode_length[self.data_id[i]]-1
+                    for i in range(self.num_envs)
+                ],
+                device=self.device,
+                dtype=torch.long
+            )
+        ### update object ###
+        self._target_states[env_ids, :3] = self.extract_data_component('obj_pos', True, self.data_id[env_ids], t)
+        self._target_states[env_ids, 3:7] = self.extract_data_component('obj_rot', True, self.data_id[env_ids], t)
+        self._target_states[env_ids, 7:10] = torch.zeros_like(self._target_states[env_ids, 7:10])
+        self._target_states[env_ids, 10:13] = torch.zeros_like(self._target_states[env_ids, 10:13])
+
+        ### update subject ###   
+        _humanoid_root_pos = self.extract_data_component('root_pos', True, self.data_id[env_ids], t)
+        _humanoid_root_rot = self.extract_data_component('root_rot', True, self.data_id[env_ids], t)
+        self._humanoid_root_states[env_ids, 0:3] = _humanoid_root_pos
+        self._humanoid_root_states[env_ids, 3:7] = _humanoid_root_rot
+        self._humanoid_root_states[:, 7:10] = torch.zeros_like(self._humanoid_root_states[:, 7:10])
+        self._humanoid_root_states[:, 10:13] = torch.zeros_like(self._humanoid_root_states[:, 10:13])
+        
+        self._dof_pos[env_ids] = self.extract_data_component('dof_pos', True, self.data_id[env_ids], t)
+        self._dof_vel[env_ids] = self.extract_data_component('dof_vel', True, self.data_id[env_ids], t)
+
+
+        env_ids_int32 = self._humanoid_actor_ids[env_ids]
+        self.gym.set_actor_root_state_tensor_indexed(self.sim,
+                                                     gymtorch.unwrap_tensor(self._root_states),
+                                                     gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self._dof_state),
+                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+        
+        env_ids_int32 = self._tar_actor_ids[env_ids]
+        self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._root_states),
+                                                    gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
+        self._refresh_sim_tensors()
+        obj_contact = self.extract_data_component('contact_obj', True, self.data_id[env_ids], t)
+        obj_contact = torch.any(obj_contact > 0.1, dim=-1)
+        human_contact = self.extract_data_component('contact_human', True, self.data_id[env_ids], t)
+        for env_id, env_ptr in enumerate(self.envs):
+            if env_id in env_ids:
+                env_ptr = self.envs[env_id]
+                handle = self._target_handles[env_id]
+
+                if obj_contact[env_id] == True:
+                    self.gym.set_rigid_body_color(env_ptr, handle, 0, gymapi.MESH_VISUAL,
+                                                gymapi.Vec3(1., 0., 0.))
+                else:
+                    self.gym.set_rigid_body_color(env_ptr, handle, 0, gymapi.MESH_VISUAL,
+                                                gymapi.Vec3(0., 0., 1.))
+                    
+                handle = self.humanoid_handles[env_id]
+                for j in range(self.num_bodies):
+                    if human_contact[env_id, j] > 0.5:
+                        self.gym.set_rigid_body_color(env_ptr, handle, j, gymapi.MESH_VISUAL,
+                                                    gymapi.Vec3(1., 0., 0.))
+                    elif human_contact[env_id, j] > -0.5:
+                        self.gym.set_rigid_body_color(env_ptr, handle, j, gymapi.MESH_VISUAL,
+                                                    gymapi.Vec3(0., 1., 0.))
+                    else:
+                        self.gym.set_rigid_body_color(env_ptr, handle, j, gymapi.MESH_VISUAL,
+                                                    gymapi.Vec3(0., 0., 1.))
+        self.render(t=t)
+        self.gym.simulate(self.sim)
+
+        return
+    
+
+    def render(self, sync_frame_time=False, t=0):
+        super().render(sync_frame_time)
+
+        if self.viewer:  
+            if self.save_images:
+                env_ids = 0
+                if self.play_dataset:
+                    frame_id = t
+                else:
+                    frame_id = self.progress_buf[env_ids]
+                dataname = self.motion_file[-1][6:-3]
+                rgb_filename = "intermimic/data/images/" + dataname + "/rgb_env%d_frame%05d.png" % (env_ids, frame_id)
+                os.makedirs("intermimic/data/images/" + dataname, exist_ok=True)
+                self.gym.write_viewer_image_to_file(self.viewer,rgb_filename)
+        return
+    
 @torch.jit.script
 def compute_sdf(points1, points2):
     # type: (Tensor, Tensor) -> Tensor
