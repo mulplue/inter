@@ -1,18 +1,13 @@
-from enum import Enum
-import numpy as np
 import torch
-import os
 
 from isaacgym import gymtorch
-from isaacgym import gymapi
 from isaacgym.torch_utils import *
-import torch.utils
 
 from utils import torch_utils
 import torch.nn.functional as F
-from env.tasks.humanoid_g1 import *
-from env.tasks.intermimic import InterMimic
-import trimesh
+from env.tasks.humanoid_g1 import Humanoid_G1
+from env.tasks.intermimic import InterMimic, compute_sdf
+
 
 class InterMimicG1(Humanoid_G1, InterMimic):
 
@@ -46,7 +41,6 @@ class InterMimicG1(Humanoid_G1, InterMimic):
 
     def _load_motion(self, motion_file):
 
-        self.hoi_data_dict = []
         hoi_datas = []
         hoi_refs = []
         if type(motion_file) != type([]):
@@ -128,7 +122,6 @@ class InterMimicG1(Humanoid_G1, InterMimic):
                                                     ),dim=-1)
 
             assert(self.ref_hoi_obs_size == loaded_dict['hoi_data'].shape[-1])
-            self.hoi_data_dict.append(loaded_dict)
             loaded_dict['hoi_data'] = torch.cat([loaded_dict['hoi_data'][0:1] for _ in range(15)]+[loaded_dict['hoi_data']], dim=0)
             hoi_datas.append(loaded_dict['hoi_data'])
 
@@ -206,7 +199,6 @@ class InterMimicG1(Humanoid_G1, InterMimic):
     def _set_env_state(self, env_ids, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel):
         self._humanoid_root_states[env_ids, 0:3] = root_pos * self.scaling
         self._humanoid_root_states[env_ids, 2:3] = self.init_root_height
-        self._humanoid_root_states[env_ids, 3:7] = root_rot
         self._humanoid_root_states[env_ids, 3:5] = 0
         self._humanoid_root_states[env_ids, 5:6] = 1
         self._humanoid_root_states[env_ids, 6:7] = -1
@@ -217,6 +209,13 @@ class InterMimicG1(Humanoid_G1, InterMimic):
         self._dof_vel[env_ids] = 0
         return
 
+    def _compute_observations(self, env_ids=None):
+        if (env_ids is None):
+            self.obs_buf[:] = torch.cat((self._compute_observations_iter(None, 1), self._compute_observations_iter(None, 16), (self.progress_buf >= 5).float().unsqueeze(1)), dim=-1)
+
+        else:
+            self.obs_buf[env_ids] = torch.cat((self._compute_observations_iter(env_ids, 1), self._compute_observations_iter(env_ids, 16), (self.progress_buf[env_ids] >= 5).float().unsqueeze(1)), dim=-1)
+        return
     
     def _compute_hoi_observations(self, env_ids=None):
         key_body_pos = self._rigid_body_pos[:, self._key_body_ids, :]
@@ -224,7 +223,7 @@ class InterMimicG1(Humanoid_G1, InterMimic):
         key_body_rot = self._rigid_body_rot[:, self._key_body_ids, :]
         key_body_ang_vel = self._rigid_body_ang_vel[:, self._key_body_ids, :]
         if (env_ids is None):
-            self._curr_obs[:] = build_hoi_observations(self._rigid_body_pos[:, 0, :],
+            self._curr_obs[:] = self.build_hoi_observations(self._rigid_body_pos[:, 0, :],
                                                                self._rigid_body_rot[:, 0, :],
                                                                self._rigid_body_vel[:, 0, :],
                                                                self._rigid_body_ang_vel[:, 0, :],
@@ -241,7 +240,7 @@ class InterMimicG1(Humanoid_G1, InterMimic):
                                                                self._contact_body_ids_gt,
                                                                )
         else:
-            self._curr_obs[env_ids] = build_hoi_observations(self._rigid_body_pos[env_ids][:, 0, :],
+            self._curr_obs[env_ids] = self.build_hoi_observations(self._rigid_body_pos[env_ids][:, 0, :],
                                                                    self._rigid_body_rot[env_ids][:, 0, :],
                                                                    self._rigid_body_vel[env_ids][:, 0, :],
                                                                    self._rigid_body_ang_vel[env_ids][:, 0, :],
@@ -260,30 +259,30 @@ class InterMimicG1(Humanoid_G1, InterMimic):
         return
 
     
-def build_hoi_observations(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, 
-                           local_root_obs, root_height_obs, dof_obs_size, target_states, target_contact_buf, contact_buf, object_points, body_rot, body_vel, body_rot_vel, _key_body_ids_gt, _contact_body_ids_gt):
+    def build_hoi_observations(self, root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, 
+                               local_root_obs, root_height_obs, dof_obs_size, target_states, target_contact_buf, contact_buf, object_points, body_rot, body_vel, body_rot_vel, _key_body_ids_gt, _contact_body_ids_gt):
 
-    contact = torch.any(torch.abs(contact_buf) > 0.1, dim=-1).float()
-    target_contact = torch.any(torch.abs(target_contact_buf) > 0.1, dim=-1).float().unsqueeze(1)
+        contact = torch.any(torch.abs(contact_buf) > 0.1, dim=-1).float()
+        target_contact = torch.any(torch.abs(target_contact_buf) > 0.1, dim=-1).float().unsqueeze(1)
 
-    tar_pos = target_states[:, 0:3]
-    tar_rot = target_states[:, 3:7]
-    obj_rot_extend = tar_rot.unsqueeze(1).repeat(1, object_points.shape[1], 1).view(-1, 4)
-    object_points_extend = object_points.view(-1, 3)
-    obj_points = torch_utils.quat_rotate(obj_rot_extend, object_points_extend).view(tar_rot.shape[0], object_points.shape[1], 3) + tar_pos.unsqueeze(1)
-    ig = compute_sdf(key_body_pos, obj_points).view(-1, 3)
-    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
-    heading_rot_extend = heading_rot.unsqueeze(1).repeat(1, key_body_pos.shape[1], 1).view(-1, 4)
-    ig = quat_rotate(heading_rot_extend, ig).view(tar_pos.shape[0], -1)    
-    dof_pos_new = torch.zeros((root_pos.shape[0], 153), device=root_pos.device)
-    dof_vel_new = torch.zeros((root_pos.shape[0], 153), device=root_pos.device)    
-    dof_pos_new[:, :dof_pos.shape[1]] = dof_pos        
-    dof_vel_new[:, :dof_vel.shape[1]] = dof_vel    
-    contact_new = torch.zeros((root_pos.shape[0], 52), device=root_pos.device) 
-    contact_new[:, _contact_body_ids_gt] = contact
-    body_rot_new = torch.zeros((root_pos.shape[0], 52, 4), device=root_pos.device) 
-    body_rot_vel_new = torch.zeros((root_pos.shape[0], 52, 3), device=root_pos.device) 
-    body_rot_new[:, _key_body_ids_gt] = body_rot
-    body_rot_vel_new[:, _key_body_ids_gt] = body_rot_vel
-    obs = torch.cat((root_pos, root_rot, dof_pos_new, dof_vel_new, target_states, key_body_pos.contiguous().view(-1,key_body_pos.shape[1]*key_body_pos.shape[2]), target_contact, contact_new, ig, body_rot_new.view(-1, 52*4), body_vel.view(-1,key_body_pos.shape[1]*key_body_pos.shape[2]), body_rot_vel_new.view(-1, 52*3)), dim=-1)
-    return obs
+        tar_pos = target_states[:, 0:3]
+        tar_rot = target_states[:, 3:7]
+        obj_rot_extend = tar_rot.unsqueeze(1).repeat(1, object_points.shape[1], 1).view(-1, 4)
+        object_points_extend = object_points.view(-1, 3)
+        obj_points = torch_utils.quat_rotate(obj_rot_extend, object_points_extend).view(tar_rot.shape[0], object_points.shape[1], 3) + tar_pos.unsqueeze(1)
+        ig = compute_sdf(key_body_pos, obj_points).view(-1, 3)
+        heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+        heading_rot_extend = heading_rot.unsqueeze(1).repeat(1, key_body_pos.shape[1], 1).view(-1, 4)
+        ig = quat_rotate(heading_rot_extend, ig).view(tar_pos.shape[0], -1)    
+        dof_pos_new = torch.zeros((root_pos.shape[0], 153), device=root_pos.device)
+        dof_vel_new = torch.zeros((root_pos.shape[0], 153), device=root_pos.device)    
+        dof_pos_new[:, :dof_pos.shape[1]] = dof_pos        
+        dof_vel_new[:, :dof_vel.shape[1]] = dof_vel    
+        contact_new = torch.zeros((root_pos.shape[0], 52), device=root_pos.device) 
+        contact_new[:, _contact_body_ids_gt] = contact
+        body_rot_new = torch.zeros((root_pos.shape[0], 52, 4), device=root_pos.device) 
+        body_rot_vel_new = torch.zeros((root_pos.shape[0], 52, 3), device=root_pos.device) 
+        body_rot_new[:, _key_body_ids_gt] = body_rot
+        body_rot_vel_new[:, _key_body_ids_gt] = body_rot_vel
+        obs = torch.cat((root_pos, root_rot, dof_pos_new, dof_vel_new, target_states, key_body_pos.contiguous().view(-1,key_body_pos.shape[1]*key_body_pos.shape[2]), target_contact, contact_new, ig, body_rot_new.view(-1, 52*4), body_vel.view(-1,key_body_pos.shape[1]*key_body_pos.shape[2]), body_rot_vel_new.view(-1, 52*3)), dim=-1)
+        return obs

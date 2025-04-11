@@ -27,8 +27,6 @@
     <img src='https://img.shields.io/badge/Bilibili-Video-4EABE6?style=flat&logo=Bilibili&logoColor=4EABE6'></a>
   <a href='https://github.com/Sirui-Xu/InterMimic'>
     <img src='https://img.shields.io/badge/GitHub-Code-black?style=flat&logo=github&logoColor=white'></a>
-  <a href="" target='_blank'>
-    <img src="https://visitor-badge.laobi.icu/badge?page_id=Sirui-Xu.InterMimic&left_color=gray&right_color=orange"></a>
 </p>
 
 ## 🏠 About
@@ -45,7 +43,7 @@ We introduce InterMimic, a framework that enables a <b>single</b> policy to robu
 </p>
 
 ## 🔥 News  
-- **[2025-04-05]** We're excited by the overwhelming interest in humanoid robot support and are ahead of schedule in open-sourcing our Unitree-G1 integration—starting with a small demo with support for G1 with its original three-finger dexterous hands. Join us in exploring whole-body loco-manipulation with humanoid robots.
+- **[2025-04-05]** We're excited by the overwhelming interest in humanoid robot support and are ahead of schedule in open-sourcing our Unitree-G1 integration—starting with a small demo with support for G1 with its original three-finger dexterous hands. Join us in exploring whole-body loco-manipulation with humanoid robots!
 - **[2025-04-04]** InterMimic has been selected as a CVPR Highlight Paper 🏆. More exciting developments are on the way!
 - **[2025-03-25]** We’ve officially released the codebase and checkpoint for teacher policy inference demo — give it a try! ☕️  
 
@@ -83,7 +81,7 @@ We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along
     sh scripts/test.sh
     ```
 
-3. 🔥 New! To try it on the Unitree G1 with its three-fingered dexterous hand:
+3. 🔥 New! To try it on the Unitree G1 with its three-fingered dexterous hand—directly learned from MoCap without any external retargeting:
 
     ```bash
     conda activate intermimic

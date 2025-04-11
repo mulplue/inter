@@ -1,15 +1,11 @@
-import numpy as np
 import torch
 import os
 
-from isaacgym import gymtorch
 from isaacgym import gymapi
 from isaacgym.torch_utils import *
-import torch.utils
 
 from utils import torch_utils
 from env.tasks.humanoid import *
-import torch.nn.functional as F
 
 
 class Humanoid_G1(Humanoid_SMPLX):
@@ -168,20 +164,11 @@ class Humanoid_G1(Humanoid_SMPLX):
         return
     
     def _compute_reset(self):
-        self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(self.reset_buf, self.progress_buf, self.obs_buf,
-                                                   self._contact_forces,
-                                                   self._rigid_body_pos, self.max_episode_length[self.data_id],
-                                                   self._enable_early_termination, self._termination_heights, self._termination_heights_init, self._curr_ref_obs, self._curr_obs, self.start_times, self.rollout_length
-                                                   )
-        return
-
-
-    def _compute_observations(self, env_ids=None):
-        if (env_ids is None):
-            self.obs_buf[:] = torch.cat((self._compute_observations_iter(None, 1), self._compute_observations_iter(None, 16), (self.progress_buf >= 5).float().unsqueeze(1)), dim=-1)
-
-        else:
-            self.obs_buf[env_ids] = torch.cat((self._compute_observations_iter(env_ids, 1), self._compute_observations_iter(env_ids, 16), (self.progress_buf[env_ids] >= 5).float().unsqueeze(1)), dim=-1)
+        self.reset_buf[:], self._terminate_buf[:] = self.compute_humanoid_reset(self.reset_buf, self.progress_buf, self.obs_buf,
+                                                                                self._rigid_body_pos, self.max_episode_length[self.data_id],
+                                                                                self._enable_early_termination, self._termination_heights, self.start_times, 
+                                                                                self.rollout_length
+                                                                                )
         return
 
     def _compute_humanoid_obs(self, env_ids=None, ref_obs=None, next_ts=None):
@@ -198,128 +185,101 @@ class Humanoid_G1(Humanoid_SMPLX):
             body_ang_vel = self._rigid_body_ang_vel[env_ids]
             contact_forces = self._contact_forces[env_ids]
         
-        obs = compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, self._local_root_obs,
+        obs = self.compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, self._local_root_obs,
                                                 self._root_height_obs,
                                                 contact_forces, self._contact_body_ids, ref_obs, self._key_body_ids, 
                                                 self._key_body_ids_gt, self._contact_body_ids_gt)
 
         return obs
 
+    def compute_humanoid_observations_max(self, body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs, contact_forces, contact_body_ids, ref_obs, key_body_ids, key_body_ids_gt, contact_body_ids_gt):
+        root_pos = body_pos[:, 0, :]
+        root_rot = body_rot[:, 0, :]
 
-@torch.jit.script
-def compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs, contact_forces, contact_body_ids, ref_obs, key_body_ids, key_body_ids_gt, contact_body_ids_gt):
-    # type: (Tensor, Tensor, Tensor, Tensor, bool, bool, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
-    root_pos = body_pos[:, 0, :]
-    root_rot = body_rot[:, 0, :]
+        root_h = root_pos[:, 2:3]
+        heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+        heading_inv_rot = torch_utils.calc_heading_quat(root_rot)
 
-    root_h = root_pos[:, 2:3]
-    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
-    heading_inv_rot = torch_utils.calc_heading_quat(root_rot)
+        if (not root_height_obs):
+            root_h_obs = torch.zeros_like(root_h)
+        else:
+            root_h_obs = root_h
 
-    if (not root_height_obs):
-        root_h_obs = torch.zeros_like(root_h)
-    else:
-        root_h_obs = root_h
+        len_keypos = len(key_body_ids)
+        heading_rot_expand = heading_rot.unsqueeze(-2)
+        heading_rot_expand_2 = heading_rot_expand.repeat((1, len_keypos, 1))
+        flat_heading_rot_2 = heading_rot_expand_2.reshape(heading_rot_expand_2.shape[0] * heading_rot_expand_2.shape[1], 
+                                                heading_rot_expand_2.shape[2])
+        
+        heading_rot_expand = heading_rot_expand.repeat((1, len_keypos, 1))
+        flat_heading_rot = heading_rot_expand.reshape(heading_rot_expand.shape[0] * heading_rot_expand.shape[1], 
+                                                heading_rot_expand.shape[2])
 
-    len_keypos = len(key_body_ids)
-    heading_rot_expand = heading_rot.unsqueeze(-2)
-    heading_rot_expand_2 = heading_rot_expand.repeat((1, len_keypos, 1))
-    flat_heading_rot_2 = heading_rot_expand_2.reshape(heading_rot_expand_2.shape[0] * heading_rot_expand_2.shape[1], 
-                                               heading_rot_expand_2.shape[2])
-    
-    heading_rot_expand = heading_rot_expand.repeat((1, len_keypos, 1))
-    flat_heading_rot = heading_rot_expand.reshape(heading_rot_expand.shape[0] * heading_rot_expand.shape[1], 
-                                               heading_rot_expand.shape[2])
+        heading_inv_rot_expand = heading_inv_rot.unsqueeze(-2)
+        heading_inv_rot_expand = heading_inv_rot_expand.repeat((1, len_keypos, 1))
+        flat_heading_inv_rot = heading_inv_rot_expand.reshape(heading_inv_rot_expand.shape[0] * heading_inv_rot_expand.shape[1], 
+                                                heading_inv_rot_expand.shape[2])
+        
+        _ref_body_pos = ref_obs[:,326:326+len_keypos*3].view(-1, len_keypos, 3)
+        _body_pos = body_pos[:, key_body_ids, :]
 
-    heading_inv_rot_expand = heading_inv_rot.unsqueeze(-2)
-    heading_inv_rot_expand = heading_inv_rot_expand.repeat((1, len_keypos, 1))
-    flat_heading_inv_rot = heading_inv_rot_expand.reshape(heading_inv_rot_expand.shape[0] * heading_inv_rot_expand.shape[1], 
-                                               heading_inv_rot_expand.shape[2])
-    
-    _ref_body_pos = ref_obs[:,326:326+len_keypos*3].view(-1, len_keypos, 3)
-    _body_pos = body_pos[:, key_body_ids, :]
+        diff_global_body_pos = _ref_body_pos - _body_pos
+        diff_local_body_pos_flat = torch_utils.quat_rotate(flat_heading_rot_2, diff_global_body_pos.view(-1, 3)).view(-1, len_keypos * 3)
 
-    diff_global_body_pos = _ref_body_pos - _body_pos
-    diff_local_body_pos_flat = torch_utils.quat_rotate(flat_heading_rot_2, diff_global_body_pos.view(-1, 3)).view(-1, len_keypos * 3)
+        local_ref_body_pos = _body_pos - root_pos.unsqueeze(1)  # preserves the body position
+        local_ref_body_pos = torch_utils.quat_rotate(flat_heading_rot_2, local_ref_body_pos.view(-1, 3)).view(-1, len_keypos * 3)
 
-    local_ref_body_pos = _body_pos - root_pos.unsqueeze(1)  # preserves the body position
-    local_ref_body_pos = torch_utils.quat_rotate(flat_heading_rot_2, local_ref_body_pos.view(-1, 3)).view(-1, len_keypos * 3)
+        root_pos_expand = root_pos.unsqueeze(-2)
+        local_body_pos = body_pos[:, key_body_ids, :] - root_pos_expand
+        flat_local_body_pos = local_body_pos.reshape(local_body_pos.shape[0] * local_body_pos.shape[1], local_body_pos.shape[2])
+        flat_local_body_pos = quat_rotate(flat_heading_rot, flat_local_body_pos)
+        local_body_pos = flat_local_body_pos.reshape(local_body_pos.shape[0], local_body_pos.shape[1] * local_body_pos.shape[2])
+        local_body_pos = local_body_pos[..., 3:] # remove root pos
 
-    root_pos_expand = root_pos.unsqueeze(-2)
-    local_body_pos = body_pos[:, key_body_ids, :] - root_pos_expand
-    flat_local_body_pos = local_body_pos.reshape(local_body_pos.shape[0] * local_body_pos.shape[1], local_body_pos.shape[2])
-    flat_local_body_pos = quat_rotate(flat_heading_rot, flat_local_body_pos)
-    local_body_pos = flat_local_body_pos.reshape(local_body_pos.shape[0], local_body_pos.shape[1] * local_body_pos.shape[2])
-    local_body_pos = local_body_pos[..., 3:] # remove root pos
+        flat_body_rot = body_rot[:, key_body_ids, :].reshape(body_rot.shape[0] * len_keypos, body_rot.shape[2])
+        flat_local_body_rot = quat_mul(flat_heading_rot, flat_body_rot)
+        flat_local_body_rot_obs = torch_utils.quat_to_tan_norm(flat_local_body_rot)
+        local_body_rot_obs = flat_local_body_rot_obs.reshape(body_rot.shape[0], len_keypos * flat_local_body_rot_obs.shape[1])
+        
+        ref_body_rot = ref_obs[:, 326+len_keypos*3+1+52+len_keypos*3: 326+len_keypos*3+1+52+len_keypos*3+52*4].view(-1, 52, 4)
+        ref_body_rot_no_hand = ref_body_rot[:, key_body_ids_gt, :]
+        body_rot_no_hand = body_rot[:, key_body_ids]
 
-    flat_body_rot = body_rot[:, key_body_ids, :].reshape(body_rot.shape[0] * len_keypos, body_rot.shape[2])
-    flat_local_body_rot = quat_mul(flat_heading_rot, flat_body_rot)
-    flat_local_body_rot_obs = torch_utils.quat_to_tan_norm(flat_local_body_rot)
-    local_body_rot_obs = flat_local_body_rot_obs.reshape(body_rot.shape[0], len_keypos * flat_local_body_rot_obs.shape[1])
-    
-    ref_body_rot = ref_obs[:, 326+len_keypos*3+1+52+len_keypos*3: 326+len_keypos*3+1+52+len_keypos*3+52*4].view(-1, 52, 4)
-    ref_body_rot_no_hand = ref_body_rot[:, key_body_ids_gt, :]
-    body_rot_no_hand = body_rot[:, key_body_ids]
+        diff_global_body_rot = torch_utils.quat_mul_norm(torch_utils.quat_inverse(ref_body_rot_no_hand.reshape(-1, 4)), body_rot_no_hand.reshape(-1, 4))
+        diff_local_body_rot_flat = torch_utils.quat_mul(torch_utils.quat_mul(flat_heading_rot, diff_global_body_rot.view(-1, 4)), flat_heading_inv_rot)
+        diff_local_body_rot_obs = torch_utils.quat_to_tan_norm(diff_local_body_rot_flat)
+        diff_local_body_rot_obs = diff_local_body_rot_obs.view(body_rot_no_hand.shape[0], body_rot_no_hand.shape[1] * diff_local_body_rot_obs.shape[-1])
 
-    diff_global_body_rot = torch_utils.quat_mul_norm(torch_utils.quat_inverse(ref_body_rot_no_hand.reshape(-1, 4)), body_rot_no_hand.reshape(-1, 4))
-    diff_local_body_rot_flat = torch_utils.quat_mul(torch_utils.quat_mul(flat_heading_rot, diff_global_body_rot.view(-1, 4)), flat_heading_inv_rot)
-    diff_local_body_rot_obs = torch_utils.quat_to_tan_norm(diff_local_body_rot_flat)
-    diff_local_body_rot_obs = diff_local_body_rot_obs.view(body_rot_no_hand.shape[0], body_rot_no_hand.shape[1] * diff_local_body_rot_obs.shape[-1])
+        local_ref_body_rot = torch_utils.quat_mul(flat_heading_rot, ref_body_rot_no_hand.reshape(-1, 4))
+        local_ref_body_rot = torch_utils.quat_to_tan_norm(local_ref_body_rot).view(ref_body_rot_no_hand.shape[0], -1)
 
-    local_ref_body_rot = torch_utils.quat_mul(flat_heading_rot, ref_body_rot_no_hand.reshape(-1, 4))
-    local_ref_body_rot = torch_utils.quat_to_tan_norm(local_ref_body_rot).view(ref_body_rot_no_hand.shape[0], -1)
+        ref_body_vel = ref_obs[:, 326+len_keypos*3+1+52+len_keypos*3+52*4:326+len_keypos*3+1+52+len_keypos*3+52*4+len_keypos*3].view(-1, len_keypos, 3)
+        _body_vel = body_vel[:, key_body_ids, :]
+        diff_global_vel = ref_body_vel - _body_vel
+        diff_local_vel = torch_utils.quat_rotate(flat_heading_rot_2, diff_global_vel.view(-1, 3)).view(-1, len_keypos * 3)
 
-    ref_body_vel = ref_obs[:, 326+len_keypos*3+1+52+len_keypos*3+52*4:326+len_keypos*3+1+52+len_keypos*3+52*4+len_keypos*3].view(-1, len_keypos, 3)
-    _body_vel = body_vel[:, key_body_ids, :]
-    diff_global_vel = ref_body_vel - _body_vel
-    diff_local_vel = torch_utils.quat_rotate(flat_heading_rot_2, diff_global_vel.view(-1, 3)).view(-1, len_keypos * 3)
+        ref_body_ang_vel = ref_obs[:, 326+len_keypos*3+1+52+len_keypos*3+52*4+len_keypos*3:326+len_keypos*3+1+52+len_keypos*3+52*4+len_keypos*3+52*3]
+        ref_body_ang_vel_no_hand = ref_body_ang_vel.view(-1, 52, 3)[:, key_body_ids_gt]
+        body_ang_vel_no_hand = body_ang_vel[:, key_body_ids]
+        diff_global_ang_vel = ref_body_ang_vel_no_hand - body_ang_vel_no_hand
+        diff_local_ang_vel = torch_utils.quat_rotate(flat_heading_rot, diff_global_ang_vel.view(-1, 3)).view(-1, len_keypos * 3)
 
-    ref_body_ang_vel = ref_obs[:, 326+len_keypos*3+1+52+len_keypos*3+52*4+len_keypos*3:326+len_keypos*3+1+52+len_keypos*3+52*4+len_keypos*3+52*3]
-    ref_body_ang_vel_no_hand = ref_body_ang_vel.view(-1, 52, 3)[:, key_body_ids_gt]
-    body_ang_vel_no_hand = body_ang_vel[:, key_body_ids]
-    diff_global_ang_vel = ref_body_ang_vel_no_hand - body_ang_vel_no_hand
-    diff_local_ang_vel = torch_utils.quat_rotate(flat_heading_rot, diff_global_ang_vel.view(-1, 3)).view(-1, len_keypos * 3)
+        if (local_root_obs):
+            root_rot_obs = torch_utils.quat_to_tan_norm(root_rot)
+            local_body_rot_obs[..., 0:6] = root_rot_obs
 
-    if (local_root_obs):
-        root_rot_obs = torch_utils.quat_to_tan_norm(root_rot)
-        local_body_rot_obs[..., 0:6] = root_rot_obs
+        flat_body_vel = body_vel[:, key_body_ids, :].reshape(body_vel.shape[0] * len_keypos, body_vel.shape[2])
+        flat_local_body_vel = quat_rotate(flat_heading_rot, flat_body_vel)
+        local_body_vel = flat_local_body_vel.reshape(body_vel.shape[0], len_keypos * body_vel.shape[2])
+        
+        flat_body_ang_vel = body_ang_vel[:, key_body_ids, :].reshape(body_ang_vel.shape[0] * len_keypos, body_ang_vel.shape[2])
+        flat_local_body_ang_vel = quat_rotate(flat_heading_rot, flat_body_ang_vel)
+        local_body_ang_vel = flat_local_body_ang_vel.reshape(body_ang_vel.shape[0], len_keypos * body_ang_vel.shape[2])
 
-    flat_body_vel = body_vel[:, key_body_ids, :].reshape(body_vel.shape[0] * len_keypos, body_vel.shape[2])
-    flat_local_body_vel = quat_rotate(flat_heading_rot, flat_body_vel)
-    local_body_vel = flat_local_body_vel.reshape(body_vel.shape[0], len_keypos * body_vel.shape[2])
-    
-    flat_body_ang_vel = body_ang_vel[:, key_body_ids, :].reshape(body_ang_vel.shape[0] * len_keypos, body_ang_vel.shape[2])
-    flat_local_body_ang_vel = quat_rotate(flat_heading_rot, flat_body_ang_vel)
-    local_body_ang_vel = flat_local_body_ang_vel.reshape(body_ang_vel.shape[0], len_keypos * body_ang_vel.shape[2])
+        body_contact_buf = contact_forces[:, contact_body_ids, :].clone() #.view(contact_forces.shape[0],-1)
+        contact = torch.any(torch.abs(body_contact_buf) > 0.1, dim=-1).float()
+        ref_body_contact = ref_obs[:,326+len_keypos*3+1:326+len_keypos*3+1+52][:, contact_body_ids_gt]
+        diff_body_contact = ref_body_contact * ((ref_body_contact + 1) / 2 - contact)
 
-    body_contact_buf = contact_forces[:, contact_body_ids, :].clone() #.view(contact_forces.shape[0],-1)
-    contact = torch.any(torch.abs(body_contact_buf) > 0.1, dim=-1).float()
-    ref_body_contact = ref_obs[:,326+len_keypos*3+1:326+len_keypos*3+1+52][:, contact_body_ids_gt]
-    diff_body_contact = ref_body_contact * ((ref_body_contact + 1) / 2 - contact)
-
-    obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
-    return obs
-
-
-def compute_humanoid_reset(reset_buf, progress_buf, obs_buf, contact_buf, rigid_body_pos,
-                           max_episode_length, enable_early_termination, termination_heights, termination_heights_init, hoi_ref, hoi_obs, start_times, rollout_length):
-    terminated = torch.zeros_like(reset_buf)
-
-    if (enable_early_termination):
-        body_height = rigid_body_pos[:, 0, 2] # root height
-
-        body_fall = body_height < termination_heights# [4096] 
-        has_failed = body_fall.clone()
-        has_failed *= (progress_buf > 1)
-
-        body_fail_init = body_height < termination_heights_init
-        has_failed_init = torch.logical_and(body_fail_init, progress_buf < 10)
-        has_failed = torch.logical_or(has_failed, has_failed_init)
-        invalid_obs = ~torch.isfinite(obs_buf)
-        invalid_batches = torch.any(invalid_obs, dim=1)
-        if torch.any(invalid_obs):
-            raise Exception("invalid observation")
-        terminated = torch.where(torch.logical_or(invalid_batches, has_failed), torch.ones_like(reset_buf), terminated)
-    reset = torch.where(torch.logical_or(progress_buf >= max_episode_length-1, progress_buf - start_times >= rollout_length-1), torch.ones_like(reset_buf), terminated)
-
-    return reset, terminated
+        obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
+        return obs
