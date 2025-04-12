@@ -81,7 +81,7 @@ To replay the groud truth data, execute the following commands:
 
 *Note*: The output colors represent the ground truth contact markers for links.
 
-### Teacher Policy Trainings
+### Teacher Policy Training
 
 
 To train a teacher policy, execute the following commands:
