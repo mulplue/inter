@@ -1,6 +1,6 @@
 # if given, will override the device setting in gym. 
 env: 
-  numEnvs: 8192
+  numEnvs: 2048
   envSpacing: 1.5
   episodeLength: 1000
   isFlagrun: False
@@ -18,7 +18,10 @@ env:
   hybridInitProb: 0.5
   dataFPS: 30
   dataFramesScale: 1 # 25->30fps
-  dataSub: ['sub8']
+  dataSub: ['sub1', 'sub2', 'sub3', 'sub4', 'sub5',
+            'sub6', 'sub7', 'sub8', 'sub9', 'sub10',
+            'sub11', 'sub12', 'sub13', 'sub14', 'sub15',
+            'sub16', 'sub17']
   ballSize: 1.
   numObs: 2153
   numDoF: 43

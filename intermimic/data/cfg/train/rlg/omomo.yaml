@@ -38,7 +38,7 @@ params:
 
   config:
     name: mimic
-    full_experiment_name: init
+    full_experiment_name: smplx
     env_name: rlgpu
     multi_gpu: False
     ppo: True
@@ -56,7 +56,7 @@ params:
     max_epochs: 100000
     save_best_after: 500
     save_frequency: 500
-    print_stats: False
+    print_stats: True
     grad_norm: 1.0
     entropy_coef: 0.0
     truncate_grads: False
@@ -70,5 +70,5 @@ params:
     seq_len: 4
     bounds_loss_coef: 10
     enable_eps_greedy: False
-    resume_from: omomo/init/nn/mimic.pth
+    resume_from: checkpoints/smplx/nn/mimic.pth
     save_intermediate: False

@@ -1,6 +1,6 @@
 # if given, will override the device setting in gym. 
 env: 
-  numEnvs: 8192
+  numEnvs: 2048
   envSpacing: 2
   episodeLength: 300
   isFlagrun: False
@@ -40,7 +40,7 @@ env:
   
   rewardWeights:
     p: 40.
-    r: 1.5
+    r: 1.
     pv: 0.
     rv: 0.
 
@@ -49,14 +49,15 @@ env:
     opv: 0.1
     orv: 0.
 
-    ig: 20.
+    ig: 5.
 
-    cg1: 5.
-    cg2: 5.
+    cg_hand: 5.
+    cg_other: 5.
+    cg_all: 3.
 
-    eg1: 0.0001
-    eg2: 0.0001
-    eg3: 0.0000001
+    eg1: 0.00001
+    eg2: 0.00001
+    eg3: 0.000000001
 
 sim:
   substeps: 2

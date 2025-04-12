@@ -35,7 +35,7 @@ import learning.common_player as common_player
 
 class InterMimicPlayerContinuous(common_player.CommonPlayer):
     def __init__(self, config):
-        self._normalize_amp_input = config.get('normalize_amp_input', True)
+        self._normalize_amp_input = config.get('normalize_amp_input', False)
         
         super().__init__(config)
         return
@@ -131,7 +131,11 @@ class InterMimicPlayerContinuous(common_player.CommonPlayer):
                             if 'scores' in info:
                                 print_game_res = True
                                 game_res = info.get('scores', 0.5)
-
+                        if self.print_stats:
+                            if print_game_res:
+                                print('reward:', cur_rewards/done_count, 'steps:', cur_steps/done_count, 'w:', game_res)
+                            else:
+                                print('reward:', cur_rewards/done_count, 'steps:', cur_steps/done_count)
                         sum_game_res += game_res
                         if batch_size//self.num_agents == 1 or games_played >= n_games:
                             break

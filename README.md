@@ -43,6 +43,7 @@ We introduce InterMimic, a framework that enables a <b>single</b> policy to robu
 </p>
 
 ## 🔥 News  
+- **[2025-04-11]** The training code for teacher policies is live—try training your own policy!
 - **[2025-04-05]** We're excited by the overwhelming interest in humanoid robot support and are ahead of schedule in open-sourcing our Unitree-G1 integration—starting with a small demo with support for G1 with its original three-finger dexterous hands. Join us in exploring whole-body loco-manipulation with humanoid robots!
 - **[2025-04-04]** InterMimic has been selected as a CVPR Highlight Paper 🏆. More exciting developments are on the way!
 - **[2025-03-25]** We’ve officially released the codebase and checkpoint for teacher policy inference demo — give it a try! ☕️  
@@ -51,7 +52,7 @@ We introduce InterMimic, a framework that enables a <b>single</b> policy to robu
 
 ### Dependencies
 
-follow the following instructions: 
+Follow the following instructions: 
 
 1. Create new conda environment and install pytroch:
 
@@ -68,20 +69,29 @@ follow the following instructions:
 
 2. Download and setup [Isaac Gym](https://developer.nvidia.com/isaac-gym). 
 
-### 💾 Data Replay
+### Data Replay
 
 
-run the following commands:
+To replay the groud truth data, execute the following commands:
 
-    ```bash
-    conda activate intermimic
-    sh scripts/data_replay.sh
-    ```
+  ```bash
+  conda activate intermimic
+  sh scripts/data_replay.sh
+  ```
 
-Note: The link colors represent the ground truth contact markers.
+*Note*: The output colors represent the ground truth contact markers for links.
+
+### Teacher Policy Trainings
 
 
-### 🎓 Teacher Policy Inference
+To train a teacher policy, execute the following commands:
+
+  ```bash
+  conda activate intermimic
+  sh scripts/train.sh
+  ```
+
+### Teacher Policy Inference
 
 
 We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along with some sample data. To get started:
@@ -94,7 +104,7 @@ We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along
     sh scripts/test.sh
     ```
 
-3. 🔥 New! To try it on the Unitree G1 with its three-fingered dexterous hand—directly learned from MoCap without any external retargeting:
+3. 🔥 To try it on the Unitree G1 with its three-fingered dexterous hand—directly learned from MoCap without any external retargeting:
 
     ```bash
     conda activate intermimic
@@ -104,8 +114,8 @@ We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along
 ## 📝 TODO List  
 - [x] Release inference demo for the teacher policy  
 - [x] Add support for Unitree-G1 with dexterous robot hands
-- [ ] Release training pipeline for the teacher policy and processed MoCap data  
-- [ ] Release student policy distillation training, distilled reference data (physically correct HOI data❗️), and all related checkpoints  
+- [x] Release training pipeline for the teacher policy 
+- [ ] Release student policy distillation training, all processed MoCap and distilled reference data (physically correct HOI data❗️), and all related checkpoints  
 - [ ] Release evaluation pipeline for the student policy  
 - [ ] Release all data and processing scripts alongside the [InterAct](https://github.com/wzyabcas/InterAct) launch  
 - [ ] Release physics-based text-to-HOI and interaction prediction demo  

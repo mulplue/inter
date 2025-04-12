@@ -66,8 +66,6 @@ class BaseTask():
             self.num_envs, device=self.device, dtype=torch.long)
         self.data_id = torch.zeros(
             self.num_envs, device=self.device, dtype=torch.long)
-        self.contact_reset = torch.zeros(
-            (self.num_envs, 2), device=self.device, dtype=torch.float)
         self.extras = {}
 
         self.original_props = {}
