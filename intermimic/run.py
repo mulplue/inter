@@ -40,7 +40,8 @@ from rl_games.torch_runner import Runner
 import numpy as np
 import copy
 import torch
-
+import debugpy
+import wandb
 from learning import intermimic_agent
 from learning import intermimic_players
 from learning import intermimic_models
@@ -189,6 +190,7 @@ def main():
     cfg, cfg_train, logdir = load_cfg(args)
 
     cfg_train['params']['seed'] = set_seed(cfg_train['params'].get("seed", -1), cfg_train['params'].get("torch_deterministic", False))
+    cfg_train['params']['config']['full_experiment_name'] = args.exp_name
 
     if args.horovod:
         cfg_train['params']['config']['multi_gpu'] = args.horovod
@@ -231,6 +233,17 @@ def main():
 
     if args.ball_size!= 0.:
         cfg['env']['ballSize'] = args.ball_size
+    
+    if args.debug:
+        debugpy.listen(12361)
+        print("Waiting for client...")
+        debugpy.wait_for_client()
+
+        wandb.init(project='intermimic_v0', name="test", mode='disabled')
+
+    else:
+        
+        wandb.init(project='intermimic_v0', name=args.exp_name)
     
     # Create default directories for weights and statistics
     cfg_train['params']['config']['train_dir'] = args.output_path

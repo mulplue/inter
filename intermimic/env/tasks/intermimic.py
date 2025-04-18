@@ -739,6 +739,12 @@ class InterMimic(Humanoid_SMPLX):
         self.contact_reset = (self.contact_reset + contact_reset) * contact_reset
         self.kinematic_reset = torch.logical_or(ig_reset, kinematic_reset)
 
+        # log
+        self.extras['rb'] = rb
+        self.extras['ro'] = ro
+        self.extras['rig'] = rig
+        self.extras['rcg'] = rcg
+
         return
     
     def compute_humanoid_reward(self, w):

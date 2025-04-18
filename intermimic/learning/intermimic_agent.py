@@ -32,7 +32,7 @@ from rl_games.common import a2c_common
 import psutil
 import subprocess
 from isaacgym.torch_utils import *
-
+import wandb
 import time
 from datetime import datetime
 import numpy as np
@@ -149,6 +149,8 @@ class InterMimicAgent(common_agent.CommonAgent):
             self.experience_buffer.update_data('dones', n, self.dones)
             self.experience_buffer.update_data('rand_action_mask', n, res_dict['rand_action_mask'])
 
+            epinfos.append(infos)
+
             terminated = infos['terminate'].float()
             terminated = terminated.unsqueeze(-1)
             next_vals = self._eval_critic(self.obs)
@@ -183,11 +185,32 @@ class InterMimicAgent(common_agent.CommonAgent):
         mb_advs = self.discount_values(mb_fdones, mb_values, mb_rewards, mb_next_values)
         mb_returns = mb_advs + mb_values
 
+        self._log_rewards_info(epinfos)
+
         batch_dict = self.experience_buffer.get_transformed_list(a2c_common.swap_and_flatten01, self.tensor_list)
         batch_dict['returns'] = a2c_common.swap_and_flatten01(mb_returns)
         batch_dict['played_frames'] = self.batch_size
 
         return batch_dict
+    
+    def _log_rewards_info(self, epinfos):
+        rb = []
+        ro = []
+        rig = []
+        rcg = []
+        for info in epinfos:
+            rb.append(info['rb'])
+            ro.append(info['ro'])
+            rig.append(info['rig'])
+            rcg.append(info['rcg'])
+
+        wandb.log({
+            'rewards/rb': torch_ext.mean_list(rb).item(),
+            'rewards/ro': torch_ext.mean_list(ro).item(),
+            'rewards/rig': torch_ext.mean_list(rig).item(),
+            'rewards/rcg': torch_ext.mean_list(rcg).item(),
+            'rewards/total': torch_ext.mean_list(self.experience_buffer.tensor_dict['rewards']).item(),
+        })
 
 
     def get_action_values(self, obs_dict, rand_action_probs):
@@ -501,22 +524,41 @@ class InterMimicAgent(common_agent.CommonAgent):
         return int(result.stdout.decode().strip().split()[0])
 
     def _log_train_info(self, train_info, frame):
-        self.writer.add_scalar('performance/update_time', train_info['update_time'], frame)
-        self.writer.add_scalar('performance/play_time', train_info['play_time'], frame)
-        self.writer.add_scalar('losses/a_loss', torch_ext.mean_list(train_info['actor_loss']).item(), frame)
-        self.writer.add_scalar('losses/c_loss', torch_ext.mean_list(train_info['critic_loss']).item(), frame)
+        # self.writer.add_scalar('performance/update_time', train_info['update_time'], frame)
+        # self.writer.add_scalar('performance/play_time', train_info['play_time'], frame)
+        # self.writer.add_scalar('losses/a_loss', torch_ext.mean_list(train_info['actor_loss']).item(), frame)
+        # self.writer.add_scalar('losses/c_loss', torch_ext.mean_list(train_info['critic_loss']).item(), frame)
         
-        self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(train_info['b_loss']).item(), frame)
-        self.writer.add_scalar('losses/entropy', torch_ext.mean_list(train_info['entropy']).item(), frame)
-        self.writer.add_scalar('info/last_lr', train_info['last_lr'][-1] * train_info['lr_mul'][-1], frame)
-        self.writer.add_scalar('info/lr_mul', train_info['lr_mul'][-1], frame)
-        self.writer.add_scalar('info/e_clip', self.e_clip * train_info['lr_mul'][-1], frame)
-        self.writer.add_scalar('info/clip_frac', torch_ext.mean_list(train_info['actor_clip_frac']).item(), frame)
-        self.writer.add_scalar('info/kl', torch_ext.mean_list(train_info['kl']).item(), frame)
+        # self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(train_info['b_loss']).item(), frame)
+        # self.writer.add_scalar('losses/entropy', torch_ext.mean_list(train_info['entropy']).item(), frame)
+        # self.writer.add_scalar('info/last_lr', train_info['last_lr'][-1] * train_info['lr_mul'][-1], frame)
+        # self.writer.add_scalar('info/lr_mul', train_info['lr_mul'][-1], frame)
+        # self.writer.add_scalar('info/e_clip', self.e_clip * train_info['lr_mul'][-1], frame)
+        # self.writer.add_scalar('info/clip_frac', torch_ext.mean_list(train_info['actor_clip_frac']).item(), frame)
+        # self.writer.add_scalar('info/kl', torch_ext.mean_list(train_info['kl']).item(), frame)
 
-        self.writer.add_scalar('usage/cpu', self.get_cpu_usage(), frame)
-        self.writer.add_scalar('usage/gpu', self.get_gpu_usage(), frame)
-        self.writer.add_scalar('usage/cpu_memory', self.get_cpu_memory_usage(), frame)
-        self.writer.add_scalar('usage/gpu_memory', self.get_gpu_memory_usage(), frame)
+        # self.writer.add_scalar('usage/cpu', self.get_cpu_usage(), frame)
+        # self.writer.add_scalar('usage/gpu', self.get_gpu_usage(), frame)
+        # self.writer.add_scalar('usage/cpu_memory', self.get_cpu_memory_usage(), frame)
+        # self.writer.add_scalar('usage/gpu_memory', self.get_gpu_memory_usage(), frame)
+        wandb.log({
+            'losses/a_loss': torch_ext.mean_list(train_info['actor_loss']).item(),
+            'losses/c_loss': torch_ext.mean_list(train_info['critic_loss']).item(),
+            'losses/bounds_loss': torch_ext.mean_list(train_info['b_loss']).item(),
+            'losses/entropy': torch_ext.mean_list(train_info['entropy']).item(),
+
+            'info/last_lr': train_info['last_lr'][-1] * train_info['lr_mul'][-1],
+            'info/lr_mul': train_info['lr_mul'][-1],
+            'info/e_clip': self.e_clip * train_info['lr_mul'][-1],
+            'info/clip_frac': torch_ext.mean_list(train_info['actor_clip_frac']).item(),
+            'info/kl': torch_ext.mean_list(train_info['kl']).item(),
+
+            'performance/update_time': train_info['update_time'],
+            'performance/play_time': train_info['play_time'],
+            'usage/cpu': self.get_cpu_usage(),
+            'usage/gpu': self.get_gpu_usage(),
+            'usage/cpu_memory': self.get_cpu_memory_usage(),
+            'usage/gpu_memory': self.get_gpu_memory_usage(),
+        })
 
         return
