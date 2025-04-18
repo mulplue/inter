@@ -42,7 +42,8 @@ We introduce InterMimic, a framework that enables a <b>single</b> policy to robu
     <img src="assets/InterMimic.gif" align="center" width=60% >
 </p>
 
-## 🔥 News  
+## 🔥 News
+- **[2025-04-18]** Release a checkpoint with high‑fidelity physics and enhanced contact precision.
 - **[2025-04-11]** The training code for teacher policies is live—try training your own policy!
 - **[2025-04-05]** We're excited by the overwhelming interest in humanoid robot support and are ahead of schedule in open-sourcing our Unitree-G1 integration—starting with a small demo with support for G1 with its original three-finger dexterous hands. Join us in exploring whole-body loco-manipulation with humanoid robots!
 - **[2025-04-04]** InterMimic has been selected as a CVPR Highlight Paper 🏆. More exciting developments are on the way!
@@ -54,20 +55,26 @@ We introduce InterMimic, a framework that enables a <b>single</b> policy to robu
 
 Follow the following instructions: 
 
-1. Create new conda environment and install pytroch:
+1. Create new conda environment and install pytorch:
 
-    ```
+    ```bash
     conda create -n intermimic python=3.8
     conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia
     pip install -r requirement.txt
     ```
 
     You may also build from [environment.yml](environment.yml), which might contain redundancies,
-    ```
+    ```bash
     conda env create -f environment.yml
     ```
 
 2. Download and setup [Isaac Gym](https://developer.nvidia.com/isaac-gym). 
+
+3. Activate the environment:
+
+    ```bash
+    conda activate intermimic
+    ```
 
 ### Data Replay
 
@@ -75,7 +82,6 @@ Follow the following instructions:
 To replay the groud truth data, execute the following commands:
 
   ```bash
-  conda activate intermimic
   sh scripts/data_replay.sh
   ```
 
@@ -87,7 +93,6 @@ To replay the groud truth data, execute the following commands:
 To train a teacher policy, execute the following commands:
 
   ```bash
-  conda activate intermimic
   sh scripts/train.sh
   ```
 
@@ -100,11 +105,16 @@ We’ve released a checkpoint for one (out of 17) teacher policy on OMOMO, along
 2. Then, run the following commands:
 
     ```bash
-    conda activate intermimic
     sh scripts/test.sh
     ```
 
-3. 🔥 To try it on the Unitree G1 with its three-fingered dexterous hand—directly learned from MoCap without any external retargeting:
+3. Run the high‑fidelity physics model (trading off some efficiency for realism):
+
+    ```bash
+    sh scripts/test_high_fid.sh
+    ```
+
+4. 🔥 To try it on the Unitree G1 with its three-fingered dexterous hand—directly learned from MoCap without any external retargeting:
 
     ```bash
     conda activate intermimic
