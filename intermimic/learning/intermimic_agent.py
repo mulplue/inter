@@ -209,7 +209,7 @@ class InterMimicAgent(common_agent.CommonAgent):
             'rewards/ro': torch_ext.mean_list(ro).item(),
             'rewards/rig': torch_ext.mean_list(rig).item(),
             'rewards/rcg': torch_ext.mean_list(rcg).item(),
-            'rewards/total': torch_ext.mean_list(self.experience_buffer.tensor_dict['rewards']).item(),
+            'rewards/total': torch.mean(self.experience_buffer.tensor_dict['rewards']).item(),
         })
 
 

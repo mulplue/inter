@@ -246,13 +246,16 @@ def get_args(benchmark=False):
             "help": "Apply physics domain randomization"},
         {"name": "--torch_deterministic", "action": "store_true", "default": False,
             "help": "Apply additional PyTorch settings for more deterministic behaviour"},
-        {"name": "--output_path", "type": str, "default": "output/", "help": "Specify output directory"},
+        {"name": "--output_path", "type": str, "default": "checkpoints/", "help": "Specify output directory"},
         {"name": "--llc_checkpoint", "type": str, "default": "",
             "help": "Path to the saved weights for the low-level controller of an HRL agent."},
         {"name": "--debug", "action": "store_true", "default": False,
             "help": "Enable debug mode"},
+        {"name": "--wandb", "action": "store_true", "default": False,
+            "help": "Enable wandb logging"},
         {"name": "--exp_name", "type": str, "default": "test",
             "help": "Experiment name."},
+
         ]
 
     if benchmark:

@@ -239,11 +239,10 @@ def main():
         print("Waiting for client...")
         debugpy.wait_for_client()
 
-        wandb.init(project='intermimic_v0', name="test", mode='disabled')
-
-    else:
-        
+    if args.wandb:
         wandb.init(project='intermimic_v0', name=args.exp_name)
+    else:
+        wandb.init(project='intermimic_v0', name=args.exp_name, mode='disabled')
     
     # Create default directories for weights and statistics
     cfg_train['params']['config']['train_dir'] = args.output_path
