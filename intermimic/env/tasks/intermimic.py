@@ -72,6 +72,9 @@ class InterMimic(Humanoid_SMPLX):
 
     def post_physics_step(self):
         super().post_physics_step()
+
+        # JH: apply residual force
+        self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self._residual_force_tensor), space=gymapi.ENV_SPACE)
         return
 
     def _update_hist_hoi_obs(self, env_ids=None):
@@ -260,6 +263,7 @@ class InterMimic(Humanoid_SMPLX):
     def _create_envs(self, num_envs, spacing, num_per_row):
 
         self._target_handles = []
+        self._target_masses = []
         self._load_target_asset()
         super()._create_envs(num_envs, spacing, num_per_row)
         return
@@ -326,11 +330,13 @@ class InterMimic(Humanoid_SMPLX):
             props[p_idx].friction = 0.8
             props[p_idx].rolling_friction = 0.01
             props[p_idx].torsion_friction = 0.8
-        self.gym.set_actor_rigid_shape_properties(env_ptr, target_handle, props)
 
         self._target_handles.append(target_handle)
         self.gym.set_actor_scale(env_ptr, target_handle, self.ball_size)
 
+        # JH: get target mass & residual force
+        target_mass = self.gym.get_actor_rigid_body_properties(env_ptr, target_handle)[0].mass
+        self._target_masses.append(target_mass)
         return
 
     def _build_target_tensors(self):
@@ -343,6 +349,10 @@ class InterMimic(Humanoid_SMPLX):
         contact_force_tensor = self.gym.acquire_net_contact_force_tensor(self.sim)
         contact_force_tensor = gymtorch.wrap_tensor(contact_force_tensor)
         self._tar_contact_forces = contact_force_tensor.view(self.num_envs, bodies_per_env, 3)[..., self.num_bodies, :]
+
+        # JH: build residual force tensor
+        self._residual_force_tensor = torch.zeros((self.num_envs, bodies_per_env, 3), device=self.device, dtype=torch.float)
+        self._residual_force_tensor[:, self.num_bodies, 2] = torch.tensor(self._target_masses, device=self.device, dtype=torch.float) * 9.81
         return
     
     def _reset_target(self, env_ids):
