@@ -77,3 +77,5 @@ sim:
     num_inner_iterations: 10
     warm_start: 0.25
 
+my:
+  enabledResidualForce: False

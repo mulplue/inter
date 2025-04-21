@@ -68,13 +68,17 @@ class InterMimic(Humanoid_SMPLX):
         self.contact_reset = torch.zeros((self.num_envs, 2), device=self.device, dtype=torch.float)
         self._build_target_tensors()
 
+        # JH: apply residual force
+        self.enabled_residual_force = cfg['my']['enabledResidualForce']
+
         return
 
     def post_physics_step(self):
         super().post_physics_step()
 
         # JH: apply residual force
-        # self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self._residual_force_tensor), space=gymapi.ENV_SPACE)
+        if self.enabled_residual_force:
+            self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self._residual_force_tensor), space=gymapi.ENV_SPACE)
         return
 
     def _update_hist_hoi_obs(self, env_ids=None):
