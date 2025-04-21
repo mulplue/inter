@@ -169,6 +169,12 @@ class InterMimicAgent(common_agent.CommonAgent):
 
             self.current_rewards += rewards
             self.current_lengths += 1
+            # JH: sub reward items
+            self.current_b_rewards += infos['rb'].unsqueeze(-1)
+            self.current_o_rewards += infos['ro'].unsqueeze(-1)
+            self.current_ig_rewards += infos['rig'].unsqueeze(-1)
+            self.current_cg_rewards += infos['rcg'].unsqueeze(-1)
+
             all_done_indices = self.dones.nonzero(as_tuple=False)
             self.done_indices = all_done_indices[::self.num_agents]
   
@@ -185,6 +191,10 @@ class InterMimicAgent(common_agent.CommonAgent):
             not_dones = 1.0 - self.dones.float()
 
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
+            self.current_b_rewards = self.current_b_rewards * not_dones.unsqueeze(1)
+            self.current_o_rewards = self.current_o_rewards * not_dones.unsqueeze(1)
+            self.current_ig_rewards = self.current_ig_rewards * not_dones.unsqueeze(1)
+            self.current_cg_rewards = self.current_cg_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
             
             if (self.vec_env.env.task.viewer):

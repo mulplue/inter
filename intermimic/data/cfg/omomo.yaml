@@ -78,4 +78,4 @@ sim:
     warm_start: 0.25
 
 my:
-  enabledResidualForce: False
+  enable_residual_force: False

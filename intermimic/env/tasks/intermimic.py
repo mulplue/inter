@@ -69,7 +69,7 @@ class InterMimic(Humanoid_SMPLX):
         self._build_target_tensors()
 
         # JH: apply residual force
-        self.enabled_residual_force = cfg['my']['enabledResidualForce']
+        self.enabled_residual_force = cfg['my']['enable_residual_force']
 
         return
 
