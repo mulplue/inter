@@ -74,7 +74,7 @@ class InterMimic(Humanoid_SMPLX):
         super().post_physics_step()
 
         # JH: apply residual force
-        self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self._residual_force_tensor), space=gymapi.ENV_SPACE)
+        # self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self._residual_force_tensor), space=gymapi.ENV_SPACE)
         return
 
     def _update_hist_hoi_obs(self, env_ids=None):

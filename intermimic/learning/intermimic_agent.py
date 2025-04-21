@@ -53,6 +53,12 @@ class InterMimicAgent(common_agent.CommonAgent):
         self.resume_from = config['resume_from']
         self.done_indices = []
 
+        # JH: sub reward items
+        self.b_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+        self.o_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+        self.ig_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+        self.cg_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+
         return
 
     def train(self):
@@ -69,6 +75,12 @@ class InterMimicAgent(common_agent.CommonAgent):
         batch_shape = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['rand_action_mask'] = torch.zeros(batch_shape, dtype=torch.float32, device=self.ppo_device)
         self.tensor_list += ['amp_obs', 'rand_action_mask']
+
+        # JH: sub reward items
+        self.current_b_rewards = torch.zeros_like(self.current_rewards, dtype=self.current_rewards.dtype, device=self.ppo_device)
+        self.current_o_rewards = torch.zeros_like(self.current_rewards, dtype=self.current_rewards.dtype, device=self.ppo_device)
+        self.current_ig_rewards = torch.zeros_like(self.current_rewards, dtype=self.current_rewards.dtype, device=self.ppo_device)
+        self.current_cg_rewards = torch.zeros_like(self.current_rewards, dtype=self.current_rewards.dtype, device=self.ppo_device)
         return
     
     def set_eval(self):
@@ -149,8 +161,6 @@ class InterMimicAgent(common_agent.CommonAgent):
             self.experience_buffer.update_data('dones', n, self.dones)
             self.experience_buffer.update_data('rand_action_mask', n, res_dict['rand_action_mask'])
 
-            epinfos.append(infos)
-
             terminated = infos['terminate'].float()
             terminated = terminated.unsqueeze(-1)
             next_vals = self._eval_critic(self.obs)
@@ -164,6 +174,12 @@ class InterMimicAgent(common_agent.CommonAgent):
   
             self.game_rewards.update(self.current_rewards[self.done_indices])
             self.game_lengths.update(self.current_lengths[self.done_indices])
+            # JH: sub reward items
+            self.b_rewards.update(self.current_b_rewards[self.done_indices])
+            self.o_rewards.update(self.current_o_rewards[self.done_indices])
+            self.ig_rewards.update(self.current_ig_rewards[self.done_indices])
+            self.cg_rewards.update(self.current_cg_rewards[self.done_indices])
+
             self.algo_observer.process_infos(infos, self.done_indices)
 
             not_dones = 1.0 - self.dones.float()
@@ -185,7 +201,7 @@ class InterMimicAgent(common_agent.CommonAgent):
         mb_advs = self.discount_values(mb_fdones, mb_values, mb_rewards, mb_next_values)
         mb_returns = mb_advs + mb_values
 
-        self._log_rewards_info(epinfos)
+        self._log_rewards_info()
 
         batch_dict = self.experience_buffer.get_transformed_list(a2c_common.swap_and_flatten01, self.tensor_list)
         batch_dict['returns'] = a2c_common.swap_and_flatten01(mb_returns)
@@ -193,25 +209,21 @@ class InterMimicAgent(common_agent.CommonAgent):
 
         return batch_dict
     
-    def _log_rewards_info(self, epinfos):
-        rb = []
-        ro = []
-        rig = []
-        rcg = []
-        for info in epinfos:
-            rb.append(info['rb'])
-            ro.append(info['ro'])
-            rig.append(info['rig'])
-            rcg.append(info['rcg'])
-
-        wandb.log({
-            'rewards/rb': torch_ext.mean_list(rb).item(),
-            'rewards/ro': torch_ext.mean_list(ro).item(),
-            'rewards/rig': torch_ext.mean_list(rig).item(),
-            'rewards/rcg': torch_ext.mean_list(rcg).item(),
-            'rewards/total': torch.mean(self.experience_buffer.tensor_dict['rewards']).item(),
-        })
-
+    def _log_rewards_info(self):
+        assert self.value_size == 1
+        if self.game_rewards.current_size > 0:
+            rb = self.b_rewards.get_mean()
+            ro = self.o_rewards.get_mean()
+            rig = self.ig_rewards.get_mean()
+            rcg = self.cg_rewards.get_mean()
+            r_total = self.game_rewards.get_mean()
+            wandb.log({
+                'rewards/rb': rb,
+                'rewards/ro': ro,
+                'rewards/rig': rig,
+                'rewards/rcg': rcg,
+                'rewards/total': r_total,
+            })
 
     def get_action_values(self, obs_dict, rand_action_probs):
         processed_obs = self._preproc_obs(obs_dict['obs'])
@@ -524,23 +536,6 @@ class InterMimicAgent(common_agent.CommonAgent):
         return int(result.stdout.decode().strip().split()[0])
 
     def _log_train_info(self, train_info, frame):
-        # self.writer.add_scalar('performance/update_time', train_info['update_time'], frame)
-        # self.writer.add_scalar('performance/play_time', train_info['play_time'], frame)
-        # self.writer.add_scalar('losses/a_loss', torch_ext.mean_list(train_info['actor_loss']).item(), frame)
-        # self.writer.add_scalar('losses/c_loss', torch_ext.mean_list(train_info['critic_loss']).item(), frame)
-        
-        # self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(train_info['b_loss']).item(), frame)
-        # self.writer.add_scalar('losses/entropy', torch_ext.mean_list(train_info['entropy']).item(), frame)
-        # self.writer.add_scalar('info/last_lr', train_info['last_lr'][-1] * train_info['lr_mul'][-1], frame)
-        # self.writer.add_scalar('info/lr_mul', train_info['lr_mul'][-1], frame)
-        # self.writer.add_scalar('info/e_clip', self.e_clip * train_info['lr_mul'][-1], frame)
-        # self.writer.add_scalar('info/clip_frac', torch_ext.mean_list(train_info['actor_clip_frac']).item(), frame)
-        # self.writer.add_scalar('info/kl', torch_ext.mean_list(train_info['kl']).item(), frame)
-
-        # self.writer.add_scalar('usage/cpu', self.get_cpu_usage(), frame)
-        # self.writer.add_scalar('usage/gpu', self.get_gpu_usage(), frame)
-        # self.writer.add_scalar('usage/cpu_memory', self.get_cpu_memory_usage(), frame)
-        # self.writer.add_scalar('usage/gpu_memory', self.get_gpu_memory_usage(), frame)
         wandb.log({
             'losses/a_loss': torch_ext.mean_list(train_info['actor_loss']).item(),
             'losses/c_loss': torch_ext.mean_list(train_info['critic_loss']).item(),
@@ -562,3 +557,10 @@ class InterMimicAgent(common_agent.CommonAgent):
         })
 
         return
+    
+    def clear_stats(self):
+        super().clear_stats()
+        self.b_rewards.clear()
+        self.o_rewards.clear()
+        self.ig_rewards.clear()
+        self.cg_rewards.clear()
