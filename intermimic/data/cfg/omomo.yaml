@@ -60,7 +60,7 @@ env:
     eg3: 0.000000001
 
 sim:
-  substeps: 2
+  substeps: 4
   physx:
     num_threads: 4
     solver_type: 1  # 0: pgs, 1: tgs
@@ -72,6 +72,8 @@ sim:
     max_depenetration_velocity: 100.0
     default_buffer_size_multiplier: 20.0
     max_gpu_contact_pairs: 34603008 # 8*1024*1024
+    contact_collection: 1 # 0: never, 1: last sub-step, 2: all sub-steps (default=2)
+
 
   flex:
     num_inner_iterations: 10
