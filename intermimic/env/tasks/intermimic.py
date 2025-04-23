@@ -72,7 +72,9 @@ class InterMimic(Humanoid_SMPLX):
         self.enabled_residual_force = cfg['my']['enable_residual_force']
 
         # JH: obs
-        self.enabled_ig_obs = cfg['my']['enable_ig_obs']
+        self.enable_ig_obs = cfg['my']['enable_ig_obs']
+        self.enable_obj_vel_obs = cfg['my']['enable_obj_vel_obs']
+        self.enable_humanoid_contact_obs = cfg['my']['enable_humanoid_contact_obs']
         return
 
     def post_physics_step(self):
@@ -597,7 +599,11 @@ class InterMimic(Humanoid_SMPLX):
         ref_body_contact = self.extract_data_component('contact_human', obs=ref_obs)[:, contact_body_ids]
         diff_body_contact = ref_body_contact * ((ref_body_contact + 1) / 2 - contact)
 
-        obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
+        if self.enable_humanoid_contact_obs:
+            obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
+        else:
+            obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, diff_local_body_pos_flat, diff_local_body_rot_obs, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
+            
         return obs
     
     def compute_obj_observations(self, root_states, tar_states, ref_obs):
@@ -644,7 +650,10 @@ class InterMimic(Humanoid_SMPLX):
         diff_global_ang_vel = ref_obj_ang_vel - tar_ang_vel
         diff_local_ang_vel = torch_utils.quat_rotate(heading_rot, diff_global_ang_vel)
 
-        obs = torch.cat([local_tar_vel, local_tar_ang_vel, diff_local_obj_pos_flat, diff_local_obj_rot_obs, diff_local_vel, diff_local_ang_vel], dim=-1)
+        if self.enable_obj_vel_obs:
+            obs = torch.cat([local_tar_vel, local_tar_ang_vel, diff_local_obj_pos_flat, diff_local_obj_rot_obs, diff_local_vel, diff_local_ang_vel], dim=-1)
+        else:
+            obs = torch.cat([diff_local_obj_pos_flat, diff_local_obj_rot_obs], dim=-1)
         return obs
     
     def _compute_observations_iter(self, env_ids=None, delta_t=1):
@@ -657,7 +666,7 @@ class InterMimic(Humanoid_SMPLX):
         obs = self._compute_humanoid_obs(env_ids, ref_obs, next_ts)
         task_obs = self._compute_task_obs(env_ids, ref_obs)
         obs = torch.cat([obs, task_obs], dim=-1)    
-        if self.enabled_ig_obs:
+        if self.enable_ig_obs:
             ig_all, ig, ref_ig = self._compute_ig_obs(env_ids, ref_obs)
             return torch.cat((obs,ig_all,ref_ig-ig),dim=-1)
         else:

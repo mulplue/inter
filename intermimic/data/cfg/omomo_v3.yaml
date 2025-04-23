@@ -20,7 +20,7 @@ env:
   dataFramesScale: 1 # 25->30fps
   dataSub: ['sub2']
   ballSize: 1.
-  numObs: 3198
+  numObs: 2612    # JH: based on obs
   motion_file: InterAct/OMOMO
   robotType: "smplx/omomo.xml"
   objectDensity: 200
@@ -72,6 +72,7 @@ sim:
     max_depenetration_velocity: 100.0
     default_buffer_size_multiplier: 20.0
     max_gpu_contact_pairs: 34603008 # 8*1024*1024
+    contact_collection: 2 # 0: never, 1: last sub-step, 2: all sub-steps (default=2)
 
 
   flex:
@@ -80,4 +81,6 @@ sim:
 
 my:
   enable_residual_force: False
-  enable_ig_obs: True
+  enable_ig_obs: False
+  enable_obj_vel_obs: False
+  enable_humanoid_contact_obs: False
