@@ -71,6 +71,8 @@ class InterMimic(Humanoid_SMPLX):
         # JH: apply residual force
         self.enabled_residual_force = cfg['my']['enable_residual_force']
 
+        # JH: obs
+        self.enabled_ig_obs = cfg['my']['enable_ig_obs']
         return
 
     def post_physics_step(self):
@@ -655,8 +657,11 @@ class InterMimic(Humanoid_SMPLX):
         obs = self._compute_humanoid_obs(env_ids, ref_obs, next_ts)
         task_obs = self._compute_task_obs(env_ids, ref_obs)
         obs = torch.cat([obs, task_obs], dim=-1)    
-        ig_all, ig, ref_ig = self._compute_ig_obs(env_ids, ref_obs)
-        return torch.cat((obs,ig_all,ref_ig-ig),dim=-1)
+        if self.enabled_ig_obs:
+            ig_all, ig, ref_ig = self._compute_ig_obs(env_ids, ref_obs)
+            return torch.cat((obs,ig_all,ref_ig-ig),dim=-1)
+        else:
+            return obs
         
     def _compute_ig_obs(self, env_ids, ref_obs):
         ig = self.extract_data_component('ig', obs=self._curr_obs[env_ids]).view(env_ids.shape[0], -1, 3)

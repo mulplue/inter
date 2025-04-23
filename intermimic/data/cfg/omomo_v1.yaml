@@ -20,7 +20,7 @@ env:
   dataFramesScale: 1 # 25->30fps
   dataSub: ['sub2']
   ballSize: 1.
-  numObs: 3198
+  numObs: 2760    # JH: remove ig obs
   motion_file: InterAct/OMOMO
   robotType: "smplx/omomo.xml"
   objectDensity: 200
@@ -81,3 +81,4 @@ sim:
 
 my:
   enable_residual_force: False
+  enable_ig_obs: False
