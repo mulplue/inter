@@ -369,7 +369,7 @@ class Humanoid_SMPLX(BaseTask):
             body_ang_vel = self._rigid_body_ang_vel[env_ids]
             contact_forces = self._contact_forces[env_ids]
         
-        obs = self.compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, self._local_root_obs, self._root_height_obs,
+        obs = self.compute_humanoid_observations_max(self._dof_pos, self._dof_vel, body_pos, body_rot, body_vel, body_ang_vel, self._local_root_obs, self._root_height_obs,
                                                      contact_forces, self._contact_body_ids, ref_obs, self._key_body_ids)
 
         return obs

@@ -72,9 +72,19 @@ class InterMimic(Humanoid_SMPLX):
         self.enabled_residual_force = cfg['my']['enable_residual_force']
 
         # JH: obs
-        self.enable_ig_obs = cfg['my']['enable_ig_obs']
-        self.enable_obj_vel_obs = cfg['my']['enable_obj_vel_obs']
-        self.enable_humanoid_contact_obs = cfg['my']['enable_humanoid_contact_obs']
+        self.enable_ig_obs = cfg['my'].get('enable_ig_obs', True)
+        self.enable_obj_vel_obs = cfg['my'].get('enable_obj_vel_obs', True)
+        self.enable_humanoid_contact_obs = cfg['my'].get('enable_humanoid_contact_obs', True)
+        self.enable_cg = cfg['my'].get('enable_cg', True)
+        self.obs_version = cfg['my'].get('obs_version', 0)
+
+        # JH: hand
+        self.left_hand_bodies = cfg['my'].get('left_hand_bodies', [])
+        self.right_hand_bodies = cfg['my'].get('right_hand_bodies', [])
+
+        self._left_hand_ids = self._build_hand_ids_tensor(self.left_hand_bodies)
+        self._right_hand_ids = self._build_hand_ids_tensor(self.right_hand_bodies)
+
         return
 
     def post_physics_step(self):
@@ -368,7 +378,20 @@ class InterMimic(Humanoid_SMPLX):
         self._target_states[env_ids, 3:7] = self.extract_ref_component('obj_rot', self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids])
         self._target_states[env_ids, 7:10] = self.extract_ref_component('obj_pos_vel', self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids])
         self._target_states[env_ids, 10:13] = self.extract_ref_component('obj_rot_vel', self.data_id[env_ids], self.ref_index[env_ids], self.progress_buf[env_ids])
-        return  
+        return
+    
+    def _build_hand_ids_tensor(self, hand_names):
+        env_ptr = self.envs[0]
+        actor_handle = self.humanoid_handles[0]
+        body_ids = []
+
+        for body_name in hand_names:
+            body_id = self.gym.find_actor_rigid_body_handle(env_ptr, actor_handle, body_name)
+            assert(body_id != -1)
+            body_ids.append(body_id)
+
+        body_ids = to_torch(body_ids, device=self.device, dtype=torch.long)
+        return body_ids
 
     def _reset_env_tensors(self, env_ids):
         super()._reset_env_tensors(env_ids)
@@ -500,8 +523,8 @@ class InterMimic(Humanoid_SMPLX):
         obs = self.compute_obj_observations(root_states, tar_states, ref_obs)
         return obs
 
-    def compute_humanoid_observations_max(self, body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs, contact_forces, contact_body_ids, ref_obs, key_body_ids):
-        # type: (Tensor, Tensor, Tensor, Tensor, bool, bool, Tensor, Tensor, Tensor, Tensor) -> Tensor
+    def compute_humanoid_observations_max(self, dof_pos, dof_vel, body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs, contact_forces, contact_body_ids, ref_obs, key_body_ids):
+        # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, bool, bool, Tensor, Tensor, Tensor, Tensor) -> Tensor
         root_pos = body_pos[:, 0, :]
         root_rot = body_rot[:, 0, :]
 
@@ -599,10 +622,30 @@ class InterMimic(Humanoid_SMPLX):
         ref_body_contact = self.extract_data_component('contact_human', obs=ref_obs)[:, contact_body_ids]
         diff_body_contact = ref_body_contact * ((ref_body_contact + 1) / 2 - contact)
 
-        if self.enable_humanoid_contact_obs:
-            obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
+        # JH: get motion dof pos and dof vel
+        
+
+        if self.obs_version == 5:
+            obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 6:
+            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
+            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
+            # get hand pos
+            local_body_pos_3d = local_body_pos.reshape(local_body_pos.shape[0], -1, 3)  # (E, 52-1, 3)
+            left_hand_pos = local_body_pos_3d[:, self._left_hand_ids - 1, :].reshape(local_body_pos.shape[0], -1)
+            right_hand_pos = local_body_pos_3d[:, self._right_hand_ids - 1, :].reshape(local_body_pos.shape[0], -1)
+
+            obs = torch.cat((dof_pos, dof_vel, left_hand_pos, right_hand_pos, motion_dof_pos, motion_dof_vel), dim=-1)
+        elif self.obs_version == 7:
+            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
+            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
+            obs = torch.cat((dof_pos, dof_vel, motion_dof_pos, motion_dof_vel), dim=-1)
+            
         else:
-            obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, diff_local_body_pos_flat, diff_local_body_rot_obs, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
+            if self.enable_humanoid_contact_obs:
+                obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
+            else:
+                obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, diff_local_body_pos_flat, diff_local_body_rot_obs, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
             
         return obs
     
@@ -761,8 +804,14 @@ class InterMimic(Humanoid_SMPLX):
         rb, human_reset, key_pos, ref_key_pos = self.compute_humanoid_reward(self.reward_weights)
         ro, object_reset, obj_points, ref_obj_points = self.compute_obj_reward(self.reward_weights)
         rig, ig_reset = self.compute_ig_reward(self.reward_weights, key_pos, ref_key_pos, obj_points, ref_obj_points)
-        rcg, contact_reset = self.compute_cg_reward(self.reward_weights)
-        self.rew_buf[:] = rb * ro * rig * rcg
+        if self.enable_cg:
+            rcg, contact_reset = self.compute_cg_reward(self.reward_weights)
+            self.rew_buf[:] = rb * ro * rig * rcg
+        else:
+            rcg = torch.zeros_like(rb)
+            contact_reset = torch.zeros_like(self.contact_reset)
+            self.rew_buf[:] = rb * ro * rig
+        
         kinematic_reset = torch.logical_or(human_reset, object_reset)
         self.contact_reset = (self.contact_reset + contact_reset) * contact_reset
         self.kinematic_reset = torch.logical_or(ig_reset, kinematic_reset)

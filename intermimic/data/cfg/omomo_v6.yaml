@@ -20,7 +20,7 @@ env:
   dataFramesScale: 1 # 25->30fps
   dataSub: ['sub2']
   ballSize: 1.
-  numObs: 2736    # JH: based on obs
+  numObs: 1314    # JH: based on obs
   motion_file: InterAct/OMOMO
   robotType: "smplx/omomo.xml"
   objectDensity: 200
@@ -83,4 +83,10 @@ my:
   enable_residual_force: False
   enable_ig_obs: False
   enable_obj_vel_obs: False
-  enable_humanoid_contact_obs: True
+  enable_humanoid_contact_obs: False
+  enable_cg: False
+
+  left_hand_bodies: ['L_Wrist', 'L_Index3', 'L_Middle3', 'L_Pinky3', 'L_Ring3', 'L_Thumb3']
+  right_hand_bodies: ['R_Wrist', 'R_Index3', 'R_Middle3', 'R_Pinky3', 'R_Ring3', 'R_Thumb3']
+
+  obs_version: 6
