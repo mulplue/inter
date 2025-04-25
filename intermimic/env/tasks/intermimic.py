@@ -640,7 +640,17 @@ class InterMimic(Humanoid_SMPLX):
             motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
             motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
             obs = torch.cat((dof_pos, dof_vel, motion_dof_pos, motion_dof_vel), dim=-1)
-            
+        elif self.obs_version == 8:
+            obs = torch.cat((local_body_pos, local_body_rot_obs, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 9:
+            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
+            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
+            obs = torch.cat((dof_pos, dof_vel, local_body_pos, local_body_rot_obs, motion_dof_pos, motion_dof_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 10:
+            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
+            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
+            obs = torch.cat((dof_pos, dof_vel, motion_dof_pos, motion_dof_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+
         else:
             if self.enable_humanoid_contact_obs:
                 obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)
