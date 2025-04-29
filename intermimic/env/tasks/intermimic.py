@@ -85,6 +85,9 @@ class InterMimic(Humanoid_SMPLX):
         self._left_hand_ids = self._build_hand_ids_tensor(self.left_hand_bodies)
         self._right_hand_ids = self._build_hand_ids_tensor(self.right_hand_bodies)
 
+        # JH: root
+        self.gravity_vec = to_torch([0,0,1], device=self.device).repeat((self.num_envs, 1))
+
         return
 
     def post_physics_step(self):
@@ -523,8 +526,8 @@ class InterMimic(Humanoid_SMPLX):
         obs = self.compute_obj_observations(root_states, tar_states, ref_obs)
         return obs
 
-    def compute_humanoid_observations_max(self, dof_pos, dof_vel, body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs, contact_forces, contact_body_ids, ref_obs, key_body_ids):
-        # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, bool, bool, Tensor, Tensor, Tensor, Tensor) -> Tensor
+    def compute_humanoid_observations_max(self, dof_pos, dof_vel, body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs, contact_forces, contact_body_ids, ref_obs, key_body_ids, root_vel, root_ang_vel):
+        # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, bool, bool, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
         root_pos = body_pos[:, 0, :]
         root_rot = body_rot[:, 0, :]
 
@@ -598,12 +601,16 @@ class InterMimic(Humanoid_SMPLX):
         _body_vel = body_vel[:, key_body_ids, :]
         diff_global_vel = ref_body_vel - _body_vel
         diff_local_vel = torch_utils.quat_rotate(flat_heading_rot_2, diff_global_vel.view(-1, 3)).view(-1, len_keypos * 3)
+        # JH: get local ref body vel
+        local_ref_body_vel = torch_utils.quat_rotate(flat_heading_rot_2, ref_body_vel.view(-1, 3)).view(-1, len_keypos * 3) 
 
         ref_body_ang_vel = self.extract_data_component('body_rot_vel', obs=ref_obs)
         ref_body_ang_vel_no_hand = torch.cat((ref_body_ang_vel[:, :18*3], ref_body_ang_vel[:, 33*3:37*3]), dim=-1)
         body_ang_vel_no_hand = torch.cat((body_ang_vel[:, :18], body_ang_vel[:, 33:37]), dim=1)
         diff_global_ang_vel = ref_body_ang_vel_no_hand.view(-1, 22, 3) - body_ang_vel_no_hand
         diff_local_ang_vel = torch_utils.quat_rotate(flat_heading_rot_no_hand, diff_global_ang_vel.view(-1, 3)).view(-1, 22 * 3)
+        # JH: get local ref body ang vel
+        local_ref_body_ang_vel = torch_utils.quat_rotate(flat_heading_rot_no_hand, ref_body_ang_vel_no_hand.view(-1, 3)).view(-1, 22 * 3)
 
         if (local_root_obs):
             root_rot_obs = torch_utils.quat_to_tan_norm(root_rot)
@@ -623,13 +630,12 @@ class InterMimic(Humanoid_SMPLX):
         diff_body_contact = ref_body_contact * ((ref_body_contact + 1) / 2 - contact)
 
         # JH: get motion dof pos and dof vel
-        
+        motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
+        motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs) 
 
         if self.obs_version == 5:
             obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
         elif self.obs_version == 6:
-            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
-            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
             # get hand pos
             local_body_pos_3d = local_body_pos.reshape(local_body_pos.shape[0], -1, 3)  # (E, 52-1, 3)
             left_hand_pos = local_body_pos_3d[:, self._left_hand_ids - 1, :].reshape(local_body_pos.shape[0], -1)
@@ -637,20 +643,57 @@ class InterMimic(Humanoid_SMPLX):
 
             obs = torch.cat((dof_pos, dof_vel, left_hand_pos, right_hand_pos, motion_dof_pos, motion_dof_vel), dim=-1)
         elif self.obs_version == 7:
-            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
-            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
             obs = torch.cat((dof_pos, dof_vel, motion_dof_pos, motion_dof_vel), dim=-1)
         elif self.obs_version == 8:
             obs = torch.cat((local_body_pos, local_body_rot_obs, local_ref_body_pos, local_ref_body_rot), dim=-1)
         elif self.obs_version == 9:
-            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
-            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
             obs = torch.cat((dof_pos, dof_vel, local_body_pos, local_body_rot_obs, motion_dof_pos, motion_dof_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
         elif self.obs_version == 10:
-            motion_dof_pos = dof_pos - self.extract_data_component('dof_pos', obs=ref_obs)
-            motion_dof_vel = dof_vel - self.extract_data_component('dof_vel', obs=ref_obs)
             obs = torch.cat((dof_pos, dof_vel, motion_dof_pos, motion_dof_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 11:
+            # get ref ig
+            ref_ig = self.extract_data_component('ig', obs=ref_obs)
+            ref_ig = ref_ig.view(ref_obs.shape[0], -1, 3)[:, self._key_body_ids, :]
+            ref_ig_norm = ref_ig.norm(dim=-1, keepdim=True)
+            ref_ig = ref_ig / (ref_ig_norm + 1e-6) * (-5 * ref_ig_norm).exp()  
+            ref_ig = ref_ig.view(ref_obs.shape[0], -1)
+            obs = torch.cat((dof_pos, dof_vel, local_ref_body_pos, local_ref_body_rot, ref_ig), dim=-1)
+        elif self.obs_version == 12:
+            obs = torch.cat((local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 13:
+            obs = torch.cat((dof_pos, dof_vel, motion_dof_pos, motion_dof_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 14:
+            obs = torch.cat((dof_pos, dof_vel, motion_dof_pos, motion_dof_vel, local_ref_body_pos, local_ref_body_rot, local_ref_body_vel, local_ref_body_ang_vel), dim=-1)
+        elif self.obs_version == 15:
+            obs = torch.cat((dof_pos, dof_vel, local_body_vel, local_body_ang_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 16:
+            obs = torch.cat((dof_pos, dof_vel, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, local_ref_body_pos, local_ref_body_rot), dim=-1)
+        elif self.obs_version == 'w1':
+            # get proprio obs
+            last_action = self.actions
+            root_proj_grav = quat_rotate_inverse(root_rot, self.gravity_vec)
+            proprio_obs = torch.cat((dof_pos, dof_vel, root_ang_vel, root_proj_grav, last_action), dim=-1)
+            # get motion obs
+            local_ref_root_vel = local_ref_body_vel[:,0:3]
+            local_ref_root_ang_vel = local_ref_body_ang_vel[:,0:3]
+            ref_root_proj_grav = quat_rotate_inverse(local_ref_body_rot[:,0:3], self.gravity_vec)
+            ref_root_height = local_ref_body_pos[:,2:3]
+            motion_obs = torch.cat((motion_dof_pos, local_ref_body_pos, local_ref_root_vel, local_ref_root_ang_vel, ref_root_proj_grav, ref_root_height), dim=-1)
 
+            obs = torch.cat((proprio_obs, motion_obs), dim=-1)
+        elif self.obs_version == 'w2':
+            # get proprio obs
+            last_action = self.actions
+            root_proj_grav = quat_rotate_inverse(root_rot, self.gravity_vec)
+            proprio_obs = torch.cat((dof_pos, dof_vel, root_ang_vel, root_proj_grav, last_action), dim=-1)
+            # get motion obs
+            local_ref_root_vel = local_ref_body_vel[:,0:3]
+            local_ref_root_ang_vel = local_ref_body_ang_vel[:,0:3]
+            ref_root_proj_grav = quat_rotate_inverse(local_ref_body_rot[:,0:3], self.gravity_vec)
+            ref_root_height = local_ref_body_pos[:,2:3]
+            motion_obs = torch.cat((motion_dof_pos, motion_dof_vel, local_ref_body_pos, local_ref_body_rot, local_ref_body_vel, local_ref_body_ang_vel, ref_root_proj_grav, ref_root_height), dim=-1)
+
+            obs = torch.cat((proprio_obs, motion_obs), dim=-1)
         else:
             if self.enable_humanoid_contact_obs:
                 obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, contact, diff_local_body_pos_flat, diff_local_body_rot_obs, diff_body_contact, local_ref_body_pos, local_ref_body_rot, diff_local_vel, diff_local_ang_vel), dim=-1)

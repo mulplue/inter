@@ -20,7 +20,7 @@ env:
   dataFramesScale: 1 # 25->30fps
   dataSub: ['sub2']
   ballSize: 1.
-  numObs: 1632    # JH: 2 * (9 + x)
+  numObs: 1890    # JH: 2 * (9 + 936)
   motion_file: InterAct/OMOMO
   robotType: "smplx/omomo.xml"
   objectDensity: 200
@@ -86,4 +86,4 @@ my:
   enable_humanoid_contact_obs: False
   enable_cg: False
 
-  obs_version: 10
+  obs_version: 14
